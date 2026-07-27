@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"location/internal/metrics"
 	"location/internal/model"
 	"location/internal/repository"
 )
@@ -18,11 +19,12 @@ type Service interface {
 }
 
 type svc struct {
-	repo repository.Repository
+	repo    repository.Repository
+	metrics *metrics.Metrics
 }
 
-func New(repo repository.Repository) Service {
-	return &svc{repo: repo}
+func New(repo repository.Repository, m *metrics.Metrics) Service {
+	return &svc{repo: repo, metrics: m}
 }
 
 func (s *svc) Save(ctx context.Context, input model.CreateInput) (*model.Location, error) {
@@ -42,6 +44,9 @@ func (s *svc) Save(ctx context.Context, input model.CreateInput) (*model.Locatio
 	}
 	if err := s.repo.Save(ctx, loc); err != nil {
 		return nil, fmt.Errorf("save location: %w", err)
+	}
+	if s.metrics != nil {
+		s.metrics.RecordSave(ctx, input.LivePeriod > 0)
 	}
 	return loc, nil
 }

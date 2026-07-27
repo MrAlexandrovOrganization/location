@@ -4,6 +4,7 @@ services:
     restart: unless-stopped
     environment:
       ADDR: ":8080"
+      METRICS_PORT: "9104"
       POSTGRES_URL: "postgres://location:${LOCATION_DB_PASSWORD:-location}@postgres:5432/location?sslmode=disable"
     depends_on:
       postgres:
@@ -11,6 +12,7 @@ services:
     networks:
       - location-net
       - location-api-net
+      - monitoring-net
 
   postgres:
     image: postgres:17-alpine

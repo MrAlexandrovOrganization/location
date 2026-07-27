@@ -25,6 +25,9 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /locations", h.list)
 	mux.HandleFunc("GET /locations/{id}", h.get)
 	mux.HandleFunc("DELETE /locations/{id}", h.delete)
+	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
 }
 
 func (h *Handler) save(w http.ResponseWriter, r *http.Request) {
