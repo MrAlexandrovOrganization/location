@@ -1,0 +1,38 @@
+services:
+  location:
+    build: .
+    restart: unless-stopped
+    environment:
+      ADDR: ":8080"
+      POSTGRES_URL: "postgres://location:${LOCATION_DB_PASSWORD:-location}@postgres:5432/location?sslmode=disable"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - location-net
+      - location-api-net
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: location
+      POSTGRES_PASSWORD: ${LOCATION_DB_PASSWORD:-location}
+      POSTGRES_DB: location
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U location"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - location-net
+
+networks:
+  location-net:
+  location-api-net:
+    name: location-api-net
+
+volumes:
+  postgres-data:
