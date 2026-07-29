@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -19,25 +20,48 @@ func NewPostgres(db *pgxpool.Pool) Repository {
 
 func (r *postgres) Save(ctx context.Context, loc *model.Location) error {
 	_, err := r.db.Exec(ctx, `
-		INSERT INTO locations (id, latitude, longitude, accuracy, live_period, date, recorded_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+		INSERT INTO locations (id, latitude, longitude, accuracy, live_period, date, hidden, recorded_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
 		loc.ID, loc.Latitude, loc.Longitude, loc.Accuracy,
-		loc.LivePeriod, loc.Date, loc.RecordedAt,
+		loc.LivePeriod, loc.Date, loc.Hidden, loc.RecordedAt,
 	)
 	return err
 }
 
 func (r *postgres) Get(ctx context.Context, id string) (*model.Location, error) {
 	row := r.db.QueryRow(ctx, `
-		SELECT id, latitude, longitude, accuracy, live_period, date, recorded_at
+		SELECT id, latitude, longitude, accuracy, live_period, date, hidden, recorded_at
 		FROM locations WHERE id = $1`, id)
 	return scanLocation(row)
 }
 
-func (r *postgres) ListByDate(ctx context.Context, date string) ([]*model.Location, error) {
-	rows, err := r.db.Query(ctx, `
-		SELECT id, latitude, longitude, accuracy, live_period, date, recorded_at
-		FROM locations WHERE date = $1 ORDER BY recorded_at ASC`, date)
+// GetLatestValid returns the most recent non-hidden point for the given date.
+// Returns nil (no error) when no valid point exists yet.
+func (r *postgres) GetLatestValid(ctx context.Context, date string) (*model.Location, error) {
+	row := r.db.QueryRow(ctx, `
+		SELECT id, latitude, longitude, accuracy, live_period, date, hidden, recorded_at
+		FROM locations
+		WHERE date = $1 AND NOT hidden
+		ORDER BY recorded_at DESC
+		LIMIT 1`, date)
+	loc, err := scanLocation(row)
+	if err == ErrNotFound {
+		return nil, nil
+	}
+	return loc, err
+}
+
+func (r *postgres) ListByDate(ctx context.Context, date string, includeHidden bool) ([]*model.Location, error) {
+	query := `
+		SELECT id, latitude, longitude, accuracy, live_period, date, hidden, recorded_at
+		FROM locations
+		WHERE date = $1`
+	if !includeHidden {
+		query += ` AND NOT hidden`
+	}
+	query += ` ORDER BY recorded_at ASC`
+
+	rows, err := r.db.Query(ctx, query, date)
 	if err != nil {
 		return nil, err
 	}
@@ -74,13 +98,13 @@ func scanLocation(row scanner) (*model.Location, error) {
 	var recordedAt time.Time
 	err := row.Scan(
 		&loc.ID, &loc.Latitude, &loc.Longitude, &loc.Accuracy,
-		&loc.LivePeriod, &loc.Date, &recordedAt,
+		&loc.LivePeriod, &loc.Date, &loc.Hidden, &recordedAt,
 	)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, ErrNotFound
 		}
-		return nil, err
+		return nil, fmt.Errorf("scan location: %w", err)
 	}
 	loc.RecordedAt = recordedAt
 	return &loc, nil

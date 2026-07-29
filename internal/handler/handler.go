@@ -70,8 +70,9 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "date query param is required")
 		return
 	}
+	includeHidden := r.URL.Query().Get("include_hidden") == "true"
 
-	locs, err := h.svc.ListByDate(r.Context(), date)
+	locs, err := h.svc.ListByDate(r.Context(), date, includeHidden)
 	if err != nil {
 		slog.Error("list locations", "error", err)
 		writeErr(w, http.StatusInternalServerError, "list failed")

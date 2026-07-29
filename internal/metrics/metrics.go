@@ -15,9 +15,10 @@ import (
 )
 
 type Metrics struct {
-	savesTotal   metric.Int64Counter
-	httpRequests metric.Int64Counter
-	httpDuration metric.Float64Histogram
+	savesTotal    metric.Int64Counter
+	filteredTotal metric.Int64Counter
+	httpRequests  metric.Int64Counter
+	httpDuration  metric.Float64Histogram
 }
 
 // Init sets up the OTel → Prometheus pipeline and returns the /metrics HTTP handler.
@@ -44,6 +45,13 @@ func New() (*Metrics, error) {
 		return nil, err
 	}
 
+	filteredTotal, err := meter.Int64Counter("location.filtered.total",
+		metric.WithDescription("Points rejected by velocity filter"),
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	httpRequests, err := meter.Int64Counter("location.http.requests.total",
 		metric.WithDescription("Total HTTP requests by method, path and status"),
 	)
@@ -60,19 +68,28 @@ func New() (*Metrics, error) {
 	}
 
 	return &Metrics{
-		savesTotal:   savesTotal,
-		httpRequests: httpRequests,
-		httpDuration: httpDuration,
+		savesTotal:    savesTotal,
+		filteredTotal: filteredTotal,
+		httpRequests:  httpRequests,
+		httpDuration:  httpDuration,
 	}, nil
 }
 
-// RecordSave increments the save counter. live=true for EditedMessage updates.
-func (m *Metrics) RecordSave(ctx context.Context, live bool) {
+// RecordFiltered increments the velocity-filter rejection counter.
+func (m *Metrics) RecordFiltered(ctx context.Context) {
+	m.filteredTotal.Add(ctx, 1)
+}
+
+// RecordSave increments the save counter.
+func (m *Metrics) RecordSave(ctx context.Context, live bool, hidden bool) {
 	kind := "once"
 	if live {
 		kind = "live"
 	}
-	m.savesTotal.Add(ctx, 1, metric.WithAttributes(attribute.String("kind", kind)))
+	m.savesTotal.Add(ctx, 1, metric.WithAttributes(
+		attribute.String("kind", kind),
+		attribute.Bool("hidden", hidden),
+	))
 }
 
 // Middleware wraps an http.Handler and records request count and duration.
