@@ -9,6 +9,7 @@ type Location struct {
 	Accuracy   float32   `json:"accuracy"`
 	LivePeriod int       `json:"live_period"`
 	Date       string    `json:"date"`
+	Source     string    `json:"source"`
 	Hidden     bool      `json:"hidden"`
 	RecordedAt time.Time `json:"recorded_at"`
 }
@@ -19,5 +20,6 @@ type CreateInput struct {
 	Accuracy   float32
 	LivePeriod int
 	Date       string
+	Source     string
 	RecordedAt time.Time
 }

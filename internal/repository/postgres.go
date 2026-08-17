@@ -20,17 +20,17 @@ func NewPostgres(db *pgxpool.Pool) Repository {
 
 func (r *postgres) Save(ctx context.Context, loc *model.Location) error {
 	_, err := r.db.Exec(ctx, `
-		INSERT INTO locations (id, latitude, longitude, accuracy, live_period, date, hidden, recorded_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+		INSERT INTO locations (id, latitude, longitude, accuracy, live_period, date, hidden, source, recorded_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8::location_source, $9)`,
 		loc.ID, loc.Latitude, loc.Longitude, loc.Accuracy,
-		loc.LivePeriod, loc.Date, loc.Hidden, loc.RecordedAt,
+		loc.LivePeriod, loc.Date, loc.Hidden, loc.Source, loc.RecordedAt,
 	)
 	return err
 }
 
 func (r *postgres) Get(ctx context.Context, id string) (*model.Location, error) {
 	row := r.db.QueryRow(ctx, `
-		SELECT id, latitude, longitude, accuracy, live_period, date, hidden, recorded_at
+		SELECT id, latitude, longitude, accuracy, live_period, date, hidden, source::text, recorded_at
 		FROM locations WHERE id = $1`, id)
 	return scanLocation(row)
 }
@@ -39,7 +39,7 @@ func (r *postgres) Get(ctx context.Context, id string) (*model.Location, error) 
 // Returns nil (no error) when no valid point exists yet.
 func (r *postgres) GetLatestValid(ctx context.Context, date string) (*model.Location, error) {
 	row := r.db.QueryRow(ctx, `
-		SELECT id, latitude, longitude, accuracy, live_period, date, hidden, recorded_at
+		SELECT id, latitude, longitude, accuracy, live_period, date, hidden, source::text, recorded_at
 		FROM locations
 		WHERE date = $1 AND NOT hidden
 		ORDER BY recorded_at DESC
@@ -53,7 +53,7 @@ func (r *postgres) GetLatestValid(ctx context.Context, date string) (*model.Loca
 
 func (r *postgres) ListByDate(ctx context.Context, date string, includeHidden bool) ([]*model.Location, error) {
 	query := `
-		SELECT id, latitude, longitude, accuracy, live_period, date, hidden, recorded_at
+		SELECT id, latitude, longitude, accuracy, live_period, date, hidden, source::text, recorded_at
 		FROM locations
 		WHERE date = $1`
 	if !includeHidden {
@@ -98,7 +98,7 @@ func scanLocation(row scanner) (*model.Location, error) {
 	var recordedAt time.Time
 	err := row.Scan(
 		&loc.ID, &loc.Latitude, &loc.Longitude, &loc.Accuracy,
-		&loc.LivePeriod, &loc.Date, &loc.Hidden, &recordedAt,
+		&loc.LivePeriod, &loc.Date, &loc.Hidden, &loc.Source, &recordedAt,
 	)
 	if err != nil {
 		if err == pgx.ErrNoRows {

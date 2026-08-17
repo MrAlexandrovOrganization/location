@@ -37,6 +37,7 @@ func (h *Handler) save(w http.ResponseWriter, r *http.Request) {
 		Accuracy   float32   `json:"accuracy"`
 		LivePeriod int       `json:"live_period"`
 		Date       string    `json:"date"`
+		Source     string    `json:"source"`
 		RecordedAt time.Time `json:"recorded_at"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -54,6 +55,7 @@ func (h *Handler) save(w http.ResponseWriter, r *http.Request) {
 		Accuracy:   body.Accuracy,
 		LivePeriod: body.LivePeriod,
 		Date:       body.Date,
+		Source:     body.Source,
 		RecordedAt: body.RecordedAt,
 	})
 	if err != nil {

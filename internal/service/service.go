@@ -36,6 +36,11 @@ func (s *svc) Save(ctx context.Context, input model.CreateInput) (*model.Locatio
 		recordedAt = time.Now()
 	}
 
+	source := input.Source
+	if source == "" {
+		source = "unknown"
+	}
+
 	loc := &model.Location{
 		ID:         uuid.New().String(),
 		Latitude:   input.Latitude,
@@ -43,6 +48,7 @@ func (s *svc) Save(ctx context.Context, input model.CreateInput) (*model.Locatio
 		Accuracy:   input.Accuracy,
 		LivePeriod: input.LivePeriod,
 		Date:       input.Date,
+		Source:     source,
 		RecordedAt: recordedAt,
 		Hidden:     false,
 	}
