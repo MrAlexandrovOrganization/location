@@ -13,7 +13,8 @@ services:
     networks:
       - location-net
       - location-api-net
-      - monitoring-net
+      - prometheus-net
+      - jaeger-net
 
   postgres:
     image: postgres:17-alpine
@@ -22,8 +23,11 @@ services:
       POSTGRES_USER: location
       POSTGRES_PASSWORD: ${LOCATION_DB_PASSWORD:-location}
       POSTGRES_DB: location
+      # Read-only Grafana role (created by postgres/init/10-grafana-readonly.sh on first init)
+      GRAFANA_DB_PASSWORD: ${GRAFANA_DB_PASSWORD:-grafana_ro_password}
     volumes:
       - postgres-data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
     ports:
       - "127.0.0.1:5434:5432"
     healthcheck:
@@ -33,13 +37,17 @@ services:
       retries: 5
     networks:
       - location-net
-      - monitoring-net
+      - grafana-datasources-net
 
 networks:
   location-net:
   location-api-net:
     name: location-api-net
-  monitoring-net:
+  prometheus-net:
+    external: true
+  jaeger-net:
+    external: true
+  grafana-datasources-net:
     external: true
 
 volumes:

@@ -1,0 +1,18 @@
+apiVersion: 1
+datasources:
+  - name: grafana-postgresql-datasource
+    uid: eftexe5xy5hxca
+    type: grafana-postgresql-datasource
+    access: proxy
+    url: location-postgres-1:5432
+    user: grafana_ro
+    database: location
+    jsonData:
+      sslmode: disable
+      postgresVersion: 1700
+      maxOpenConns: 100
+      maxIdleConns: 100
+      connMaxLifetime: 14400
+    secureJsonData:
+      password: ${GRAFANA_DB_PASSWORD}
+    isDefault: false
