@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
@@ -110,6 +111,12 @@ func (m *Metrics) Middleware(next http.Handler) http.Handler {
 			attribute.String("method", r.Method),
 			attribute.String("path", r.URL.Path),
 		))
+		slog.InfoContext(r.Context(), "http request",
+			"method", r.Method,
+			"path", r.URL.Path,
+			"status", rw.status,
+			"duration_ms", time.Since(start).Milliseconds(),
+		)
 	})
 }
 

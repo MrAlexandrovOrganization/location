@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -41,11 +42,11 @@ func (h *Handler) save(w http.ResponseWriter, r *http.Request) {
 		RecordedAt time.Time `json:"recorded_at"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		writeErr(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
+		writeErr(r.Context(), w, http.StatusBadRequest, "invalid JSON: "+err.Error())
 		return
 	}
 	if body.Date == "" {
-		writeErr(w, http.StatusBadRequest, "date is required")
+		writeErr(r.Context(), w, http.StatusBadRequest, "date is required")
 		return
 	}
 
@@ -59,65 +60,65 @@ func (h *Handler) save(w http.ResponseWriter, r *http.Request) {
 		RecordedAt: body.RecordedAt,
 	})
 	if err != nil {
-		slog.Error("save location", "error", err)
-		writeErr(w, http.StatusInternalServerError, "save failed")
+		slog.ErrorContext(r.Context(), "save location", "error", err)
+		writeErr(r.Context(), w, http.StatusInternalServerError, "save failed")
 		return
 	}
-	writeJSON(w, http.StatusCreated, loc)
+	writeJSON(r.Context(), w, http.StatusCreated, loc)
 }
 
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 	date := r.URL.Query().Get("date")
 	if date == "" {
-		writeErr(w, http.StatusBadRequest, "date query param is required")
+		writeErr(r.Context(), w, http.StatusBadRequest, "date query param is required")
 		return
 	}
 	includeHidden := r.URL.Query().Get("include_hidden") == "true"
 
 	locs, err := h.svc.ListByDate(r.Context(), date, includeHidden)
 	if err != nil {
-		slog.Error("list locations", "error", err)
-		writeErr(w, http.StatusInternalServerError, "list failed")
+		slog.ErrorContext(r.Context(), "list locations", "error", err)
+		writeErr(r.Context(), w, http.StatusInternalServerError, "list failed")
 		return
 	}
-	writeJSON(w, http.StatusOK, locs)
+	writeJSON(r.Context(), w, http.StatusOK, locs)
 }
 
 func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
 	loc, err := h.svc.Get(r.Context(), r.PathValue("id"))
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
-			writeErr(w, http.StatusNotFound, "not found")
+			writeErr(r.Context(), w, http.StatusNotFound, "not found")
 			return
 		}
-		writeErr(w, http.StatusInternalServerError, "get failed")
+		writeErr(r.Context(), w, http.StatusInternalServerError, "get failed")
 		return
 	}
-	writeJSON(w, http.StatusOK, loc)
+	writeJSON(r.Context(), w, http.StatusOK, loc)
 }
 
 func (h *Handler) delete(w http.ResponseWriter, r *http.Request) {
 	err := h.svc.Delete(r.Context(), r.PathValue("id"))
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
-			writeErr(w, http.StatusNotFound, "not found")
+			writeErr(r.Context(), w, http.StatusNotFound, "not found")
 			return
 		}
-		slog.Error("delete location", "error", err)
-		writeErr(w, http.StatusInternalServerError, "delete failed")
+		slog.ErrorContext(r.Context(), "delete location", "error", err)
+		writeErr(r.Context(), w, http.StatusInternalServerError, "delete failed")
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func writeJSON(w http.ResponseWriter, code int, v any) {
+func writeJSON(ctx context.Context, w http.ResponseWriter, code int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	if err := json.NewEncoder(w).Encode(v); err != nil {
-		slog.Error("write json", "error", err)
+		slog.ErrorContext(ctx, "write json", "error", err)
 	}
 }
 
-func writeErr(w http.ResponseWriter, code int, msg string) {
-	writeJSON(w, code, map[string]string{"error": msg})
+func writeErr(ctx context.Context, w http.ResponseWriter, code int, msg string) {
+	writeJSON(ctx, w, code, map[string]string{"error": msg})
 }
