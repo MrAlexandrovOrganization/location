@@ -1,5 +1,5 @@
 .env
-location
+/location
 *.exe
 *.test
 *.out
