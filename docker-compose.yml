@@ -1,6 +1,10 @@
 services:
   location:
-    build: .
+    build:
+      context: .
+      args:
+        GO_VERSION: ${GO_VERSION:?Run via make}
+        ALPINE_VERSION: ${ALPINE_VERSION:?Run via make}
     restart: unless-stopped
     environment:
       ADDR: ":8080"
@@ -17,7 +21,7 @@ services:
       - jaeger-net
 
   postgres:
-    image: postgres:17-alpine
+    image: postgres:${POSTGRES_VERSION:?Run via make}
     restart: unless-stopped
     environment:
       POSTGRES_USER: location
