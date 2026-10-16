@@ -1,6 +1,7 @@
 DOCKER_COMPOSE = docker compose
 BINARY = location
 MONITORING_DATA_DIR ?= $(HOME)/.monitoring
+GRAFANA_LOCATION_DB_ADDRESS ?= location-db:5432
 
 -include .env
 export
@@ -35,12 +36,15 @@ restart:
 # consumes whatever datasource files appear there.
 .PHONY: monitoring
 monitoring:
+	@mkdir -p $(MONITORING_DATA_DIR)/prometheus-targets
+	@cp monitoring/prometheus/location.yml $(MONITORING_DATA_DIR)/prometheus-targets/location.yml
 	@mkdir -p $(MONITORING_DATA_DIR)/grafana-datasources
-	envsubst < monitoring/grafana/datasource.tpl.yaml > $(MONITORING_DATA_DIR)/grafana-datasources/location.yaml
+	envsubst '$${GRAFANA_LOCATION_DB_ADDRESS} $${GRAFANA_DB_PASSWORD}' < monitoring/grafana/datasource.tpl.yaml > $(MONITORING_DATA_DIR)/grafana-datasources/location.yaml
 	@echo "location: grafana datasource provisioned at $(MONITORING_DATA_DIR)/grafana-datasources/location.yaml"
 
 .PHONY: monitoring-down
 monitoring-down:
+	@rm -f $(MONITORING_DATA_DIR)/prometheus-targets/location.yml
 	@rm -f $(MONITORING_DATA_DIR)/grafana-datasources/location.yaml
 
 .PHONY: test

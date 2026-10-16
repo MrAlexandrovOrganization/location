@@ -1,5 +1,6 @@
 services:
   location:
+    container_name: "${CONTAINER_NAME_PREFIX:-}location"
     build:
       context: .
       args:
@@ -15,12 +16,14 @@ services:
       postgres:
         condition: service_healthy
     networks:
-      - location-net
-      - location-api-net
-      - prometheus-net
-      - jaeger-net
+      location-net: {}
+      location-api-net: {}
+      prometheus-net:
+        aliases: [location-metrics]
+      jaeger-net: {}
 
   postgres:
+    container_name: "${CONTAINER_NAME_PREFIX:-}location-postgres"
     image: postgres:${POSTGRES_VERSION:?Run via make}
     restart: unless-stopped
     environment:
@@ -40,8 +43,9 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - location-net
-      - grafana-datasources-net
+      location-net: {}
+      grafana-datasources-net:
+        aliases: [location-db]
 
 networks:
   location-net:

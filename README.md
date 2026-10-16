@@ -74,3 +74,12 @@ VM нужны Python 3.9+, Make, Docker Compose с `--wait`, Git и flock для
 обходные Compose-операции одновременно с доставкой. При первом переходе на GHCR
 `previous.json` ещё отсутствует: сохраните прежние локальные образы и конфигурацию
 для восстановления по runbook до первого релиза.
+
+## Container names and monitoring
+
+Containers are `location` and `location-postgres`. Docker clients use service names;
+metrics use the `location-metrics` alias and a stable `service: location` label.
+Set `GRAFANA_LOCATION_DB_ADDRESS` to the address reachable from Grafana:
+`location-db:5432` on the shared Docker network, or the existing VM endpoint
+when Grafana runs on another host. Provisioning never derives the address from
+the container name. `CONTAINER_NAME_PREFIX` isolates additional local/CI stacks.

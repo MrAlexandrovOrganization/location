@@ -1,0 +1,4 @@
+- targets: [location-metrics:9104]
+  labels:
+    project: location
+    service: location

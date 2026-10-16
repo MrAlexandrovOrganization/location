@@ -4,7 +4,7 @@ datasources:
     uid: eftexe5xy5hxca
     type: grafana-postgresql-datasource
     access: proxy
-    url: location-postgres-1:5432
+    url: ${GRAFANA_LOCATION_DB_ADDRESS}
     user: grafana_ro
     database: location
     jsonData:
