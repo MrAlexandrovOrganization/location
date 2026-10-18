@@ -3,7 +3,7 @@
 # Runs automatically only on first DB init (empty volume), so a fresh
 # deployment is fully self-contained.
 # On an already-initialized DB, create the role manually, e.g.:
-#   docker compose exec -e PW=... postgres psql -U location -d location \
+#   docker compose --project-directory . -f compose/docker-compose.yml exec -e PW=... postgres psql -U location -d location \
 #     -c "CREATE ROLE grafana_ro LOGIN PASSWORD '$PW';" \
 #     -c "GRANT CONNECT ON DATABASE location TO grafana_ro;" \
 #     -c "GRANT USAGE ON SCHEMA public TO grafana_ro;" \
