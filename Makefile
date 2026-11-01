@@ -14,7 +14,7 @@ build:
 	go build -o $(BINARY) ./cmd/location
 
 .PHONY: up
-up: monitoring
+up: active-check monitoring
 	$(DOCKER_COMPOSE) up -d --build
 
 .PHONY: down
@@ -80,7 +80,7 @@ image-publish:
 	python3 scripts/images.py publish
 image-deploy:
 	python3 scripts/images.py deploy
-image-activate: monitoring
+image-activate: active-check monitoring
 	$(IMAGE_COMPOSE) up -d --no-build --pull never --wait --wait-timeout 180
 
 .PHONY: check
@@ -108,3 +108,7 @@ compose-layout-check:
 	$(DOCKER_COMPOSE_BASE) --env-file /dev/null -f compose/docker-compose.yml --profile '*' config --no-interpolate --no-env-resolution --quiet
 
 check: compose-layout-check
+
+.PHONY: active-check
+active-check:
+	@test ! -e .retired || { echo "This stack has been retired" >&2; exit 1; }

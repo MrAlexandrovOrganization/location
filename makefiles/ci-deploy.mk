@@ -5,6 +5,7 @@ export IMAGE_DEPLOY_LOCK := $(HOME)/.location-images-deploy.lock
 .PHONY: ci-deploy
 ci-deploy:
 	@set -eu; \
+	test ! -e .retired; \
 	test "$$(git rev-parse --show-toplevel)" = "$$(pwd -P)"; \
 	test -n "$${IMAGE_MANIFEST_B64:-}"; \
 	test -n "$${GHCR_USER:-}"; \

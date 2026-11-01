@@ -7,11 +7,18 @@ services:
         GO_VERSION: ${GO_VERSION:?Run via make}
         ALPINE_VERSION: ${ALPINE_VERSION:?Run via make}
     restart: unless-stopped
+    ports:
+      - "127.0.0.1:18084:8080"
+    deploy:
+      resources:
+        limits:
+          memory: 128m
+          cpus: "0.5"
     environment:
       ADDR: ":8080"
       METRICS_PORT: "9104"
       POSTGRES_URL: "postgres://location:${LOCATION_DB_PASSWORD:-location}@postgres:5432/location?sslmode=disable"
-      OTEL_EXPORTER_OTLP_ENDPOINT: jaeger:4317
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${LOCATION_OTLP_ENDPOINT:-jaeger:4317}
     depends_on:
       postgres:
         condition: service_healthy
@@ -24,7 +31,12 @@ services:
 
   postgres:
     container_name: "${CONTAINER_NAME_PREFIX:-}location-postgres"
-    image: postgres:${POSTGRES_VERSION:?Run via make}
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          cpus: "0.5"
+    image: ${POSTGRES_IMAGE:?Run via make}
     restart: unless-stopped
     environment:
       POSTGRES_USER: location
