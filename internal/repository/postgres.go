@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	_ "embed"
+	"errors"
 	"fmt"
 	"time"
 
@@ -23,11 +24,11 @@ func NewPostgres(db *pgxpool.Pool) Repository {
 }
 
 func (r *postgres) Save(ctx context.Context, loc *model.Location) error {
-	tag, err := r.db.Exec(ctx, saveSQL,
+	err := r.db.QueryRow(ctx, saveSQL,
 		loc.ID, loc.Latitude, loc.Longitude, loc.Accuracy,
 		loc.LivePeriod, loc.Date, loc.Hidden, loc.Source, loc.RecordedAt,
-	)
-	if err == nil && tag.RowsAffected() == 0 {
+	).Scan(&loc.Hidden)
+	if errors.Is(err, pgx.ErrNoRows) {
 		return ErrConflict
 	}
 	return err

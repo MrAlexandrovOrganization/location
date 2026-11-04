@@ -16,7 +16,8 @@ import (
 )
 
 // TEST_DATABASE_URL must point to a disposable database: this test owns public.
-func TestPostgresDurableRetry(t *testing.T) {
+func isolatedPostgres(t *testing.T) *pgxpool.Pool {
+	t.Helper()
 	url := os.Getenv("TEST_DATABASE_URL")
 	if url == "" {
 		t.Skip("set TEST_DATABASE_URL to an isolated PostgreSQL database")
@@ -30,10 +31,16 @@ func TestPostgresDurableRetry(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	t.Cleanup(db.Close)
 	if _, err := db.Exec(ctx, "DROP SCHEMA public CASCADE; CREATE SCHEMA public"); err != nil {
 		t.Fatal(err)
 	}
+	return db
+}
+
+func TestPostgresDurableRetry(t *testing.T) {
+	db := isolatedPostgres(t)
+	ctx := context.Background()
 	// Apply the historical schema first and preserve an existing Telegram point.
 	old, err := db.Begin(ctx)
 	if err != nil {

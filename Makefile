@@ -118,6 +118,7 @@ image-compose:
 	python3 scripts/images.py compose
 
 include makefiles/ci-deploy.mk
+include makefiles/tests.mk
 
 # Read-only validation of every tracked Compose combination, without runtime secrets.
 .PHONY: compose-layout-check

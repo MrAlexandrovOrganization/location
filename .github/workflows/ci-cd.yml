@@ -28,6 +28,16 @@ jobs:
       - name: Test
         run: make check
 
+      - name: Start isolated PostgreSQL
+        run: make test-db-up
+
+      - name: Verify migrations, retries and coordinate blacklist
+        run: make test-integration
+
+      - name: Stop isolated PostgreSQL
+        if: always()
+        run: make test-db-down
+
 
   images:
     name: Build and publish application images
