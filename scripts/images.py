@@ -268,7 +268,11 @@ def operate():
             "Use image-deploy for activation; image-compose supports ps/logs/exec/run/stop/restart"
         )
     if args[0] == "run":
-        args[1:1] = ["--no-build", "--pull", "never"]
+        if any(a == "--build" or a == "--pull" or a.startswith("--pull=") for a in args[1:]):
+            raise ValueError("Run must use the already downloaded release image")
+        # Compose run does not have --no-build. With an existing immutable image
+        # and pull=never it uses that image; never request --build.
+        args[1:1] = ["--pull", "never"]
     command = compose(runtime=True)
     if (ROOT / "compose/compose.images.yaml").exists():
         command += ["-f", "compose/compose.images.yaml"]

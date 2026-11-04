@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -100,20 +101,27 @@ func (m *Metrics) Middleware(next http.Handler) http.Handler {
 		rw := &responseWriter{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(rw, r)
 		dur := time.Since(start).Seconds()
+		path := r.Pattern
+		if _, route, found := strings.Cut(path, " "); found {
+			path = route
+		}
+		if path == "" {
+			path = "unmatched"
+		}
 
 		attrs := metric.WithAttributes(
 			attribute.String("method", r.Method),
-			attribute.String("path", r.URL.Path),
+			attribute.String("path", path),
 			attribute.String("status", strconv.Itoa(rw.status)),
 		)
 		m.httpRequests.Add(r.Context(), 1, attrs)
 		m.httpDuration.Record(r.Context(), dur, metric.WithAttributes(
 			attribute.String("method", r.Method),
-			attribute.String("path", r.URL.Path),
+			attribute.String("path", path),
 		))
 		slog.InfoContext(r.Context(), "http request",
 			"method", r.Method,
-			"path", r.URL.Path,
+			"path", path,
 			"status", rw.status,
 			"duration_ms", time.Since(start).Milliseconds(),
 		)

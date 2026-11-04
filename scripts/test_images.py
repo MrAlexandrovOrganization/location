@@ -146,8 +146,15 @@ class DeliveryTests(unittest.TestCase):
         with patch.object(images, "run") as run:
             images.operate()
         self.assertIn(str(images.STATE / "compose.json"), run.call_args.args)
-        self.assertIn("--no-build", run.call_args.args)
+        self.assertNotIn("--build", run.call_args.args)
+        self.assertNotIn("--no-build", run.call_args.args)
         self.assertIn("never", run.call_args.args)
+
+    def test_explicit_run_rejects_build_override(self):
+        images.write(images.STATE / "current.json", self.manifest)
+        os.environ["IMAGE_ARGS"] = "run --build app migrate"
+        with self.assertRaises(ValueError):
+            images.operate()
 
     def test_alias_is_required_in_manifest(self):
         os.environ["IMAGE_ALIASES"] = "migrate=app"

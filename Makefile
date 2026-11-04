@@ -82,7 +82,7 @@ image-deploy:
 	python3 scripts/images.py deploy
 image-activate: active-check monitoring
 	$(IMAGE_COMPOSE) up -d --no-build --pull never --wait postgres
-	$(IMAGE_COMPOSE) run --rm --no-deps --no-build --pull never location migrate
+	$(IMAGE_COMPOSE) run --rm --no-deps --pull never location migrate
 	$(IMAGE_COMPOSE) up -d --no-build --pull never --wait --wait-timeout 180
 	curl --fail --silent --max-time 10 http://127.0.0.1:18084/readyz
 
