@@ -15,6 +15,8 @@ type Location struct {
 }
 
 type CreateInput struct {
+	// ID stays stable across delivery retries from a durable client.
+	ID         string
 	Latitude   float64
 	Longitude  float64
 	Accuracy   float32

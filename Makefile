@@ -7,7 +7,7 @@ GRAFANA_LOCATION_DB_ADDRESS ?= location-db:5432
 
 -include .env
 export
-include versions.mk
+include makefiles/versions.mk
 
 .PHONY: build
 build:
@@ -59,7 +59,7 @@ vet:
 
 .PHONY: format
 format:
-	@test -z "$$(gofmt -l .)" || (gofmt -l . && exit 1)
+	gofmt -w cmd internal migrations
 
 .PHONY: clean
 clean:
@@ -81,7 +81,24 @@ image-publish:
 image-deploy:
 	python3 scripts/images.py deploy
 image-activate: active-check monitoring
+	$(IMAGE_COMPOSE) up -d --no-build --pull never --wait postgres
+	$(IMAGE_COMPOSE) run --rm --no-deps --no-build --pull never location migrate
 	$(IMAGE_COMPOSE) up -d --no-build --pull never --wait --wait-timeout 180
+	curl --fail --silent --max-time 10 http://127.0.0.1:18084/readyz
+
+.PHONY: install run migrate test-race
+install:
+	go mod download
+run:
+	go run ./cmd/location
+migrate:
+	go run ./cmd/location migrate
+test-race:
+	go test -race ./...
+
+.PHONY: mobile-device
+mobile-device:
+	python3 scripts/mobile-device.py
 
 .PHONY: check
 check: test vet config-check

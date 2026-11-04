@@ -7,3 +7,5 @@
 # Local image release manifests and activation state
 /.images/
 .retired
+.local/
+secrets/

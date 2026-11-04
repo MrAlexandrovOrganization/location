@@ -15,7 +15,16 @@ import (
 // Applied migrations are tracked in the schema_migrations table so each file
 // is executed exactly once, even across restarts.
 func Run(ctx context.Context, db *pgxpool.Pool, files fs.FS) error {
-	if _, err := db.Exec(ctx, `
+	// One transaction/connection holds the lock through DDL and its history.
+	tx, err := db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock(736402811)"); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `
 		CREATE TABLE IF NOT EXISTS schema_migrations (
 			name       TEXT PRIMARY KEY,
 			applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -31,7 +40,7 @@ func Run(ctx context.Context, db *pgxpool.Pool, files fs.FS) error {
 
 	for _, name := range entries {
 		var exists bool
-		if err := db.QueryRow(ctx,
+		if err := tx.QueryRow(ctx,
 			"SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE name = $1)", name,
 		).Scan(&exists); err != nil {
 			return fmt.Errorf("check migration %s: %w", name, err)
@@ -45,17 +54,35 @@ func Run(ctx context.Context, db *pgxpool.Pool, files fs.FS) error {
 			return fmt.Errorf("read migration %s: %w", name, err)
 		}
 
-		if _, err := db.Exec(ctx, string(sql)); err != nil {
+		if _, err := tx.Exec(ctx, string(sql)); err != nil {
 			return fmt.Errorf("apply migration %s: %w", name, err)
 		}
 
-		if _, err := db.Exec(ctx,
+		if _, err := tx.Exec(ctx,
 			"INSERT INTO schema_migrations (name) VALUES ($1)", name,
 		); err != nil {
 			return fmt.Errorf("record migration %s: %w", name, err)
 		}
 
 		slog.Info("migration applied", "name", strings.TrimSuffix(name, ".sql"))
+	}
+	return tx.Commit(ctx)
+}
+
+// Check never mutates the schema. Migrations must run explicitly before startup.
+func Check(ctx context.Context, db *pgxpool.Pool, files fs.FS) error {
+	entries, err := fs.Glob(files, "*.sql")
+	if err != nil {
+		return err
+	}
+	for _, name := range entries {
+		var exists bool
+		if err := db.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE name = $1)", name).Scan(&exists); err != nil {
+			return fmt.Errorf("check schema: run migrate before startup")
+		}
+		if !exists {
+			return fmt.Errorf("pending migration %s: run migrate before startup", name)
+		}
 	}
 	return nil
 }

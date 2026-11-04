@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"math"
@@ -35,6 +36,11 @@ func (s *svc) Save(ctx context.Context, input model.CreateInput) (*model.Locatio
 	if recordedAt.IsZero() {
 		recordedAt = time.Now()
 	}
+	recordedAt = recordedAt.UTC().Truncate(time.Microsecond)
+	id := input.ID
+	if id == "" {
+		id = uuid.New().String()
+	}
 
 	source := input.Source
 	if source == "" {
@@ -42,7 +48,7 @@ func (s *svc) Save(ctx context.Context, input model.CreateInput) (*model.Locatio
 	}
 
 	loc := &model.Location{
-		ID:         uuid.New().String(),
+		ID:         id,
 		Latitude:   input.Latitude,
 		Longitude:  input.Longitude,
 		Accuracy:   input.Accuracy,
@@ -67,14 +73,24 @@ func (s *svc) Save(ctx context.Context, input model.CreateInput) (*model.Locatio
 					"speed_ms", fmt.Sprintf("%.1f", speed),
 					"dist_m", fmt.Sprintf("%.0f", dist),
 					"dt_s", fmt.Sprintf("%.1f", dt),
-					"lat", input.Latitude,
-					"lon", input.Longitude,
 				)
 			}
 		}
 	}
 
 	if err := s.repo.Save(ctx, loc); err != nil {
+		if errors.Is(err, repository.ErrConflict) && input.ID != "" {
+			existing, getErr := s.repo.Get(ctx, id)
+			if getErr != nil {
+				return nil, getErr
+			}
+			if existing.Latitude == loc.Latitude && existing.Longitude == loc.Longitude &&
+				existing.Accuracy == loc.Accuracy && existing.LivePeriod == loc.LivePeriod &&
+				existing.Date == loc.Date && existing.Source == loc.Source && existing.RecordedAt.Equal(loc.RecordedAt) {
+				return existing, nil
+			}
+			return nil, repository.ErrConflict
+		}
 		return nil, fmt.Errorf("save location: %w", err)
 	}
 	if s.metrics != nil {

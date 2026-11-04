@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
 	"time"
 
@@ -14,17 +15,21 @@ type postgres struct {
 	db *pgxpool.Pool
 }
 
+//go:embed queries/save.sql
+var saveSQL string
+
 func NewPostgres(db *pgxpool.Pool) Repository {
 	return &postgres{db: db}
 }
 
 func (r *postgres) Save(ctx context.Context, loc *model.Location) error {
-	_, err := r.db.Exec(ctx, `
-		INSERT INTO locations (id, latitude, longitude, accuracy, live_period, date, hidden, source, recorded_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8::location_source, $9)`,
+	tag, err := r.db.Exec(ctx, saveSQL,
 		loc.ID, loc.Latitude, loc.Longitude, loc.Accuracy,
 		loc.LivePeriod, loc.Date, loc.Hidden, loc.Source, loc.RecordedAt,
 	)
+	if err == nil && tag.RowsAffected() == 0 {
+		return ErrConflict
+	}
 	return err
 }
 
