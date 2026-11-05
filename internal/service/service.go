@@ -62,7 +62,11 @@ func (s *svc) Save(ctx context.Context, input model.CreateInput) (*model.Locatio
 	// Compare against the last non-hidden point.
 	// This handles consecutive outliers: each outlier is always compared
 	// to the last valid point, not to the previous outlier.
-	if prev, err := s.repo.GetLatestValid(ctx, input.Date); err == nil && prev != nil {
+	prev, err := s.repo.GetLatestValid(ctx, input.Date, recordedAt)
+	if err != nil {
+		return nil, fmt.Errorf("find location reference: %w", err)
+	}
+	if prev != nil {
 		dt := recordedAt.Sub(prev.RecordedAt).Seconds()
 		if dt > 0 {
 			dist := haversineMeters(prev.Latitude, prev.Longitude, input.Latitude, input.Longitude)
@@ -78,7 +82,12 @@ func (s *svc) Save(ctx context.Context, input model.CreateInput) (*model.Locatio
 		}
 	}
 
-	if err := s.repo.Save(ctx, loc); err != nil {
+	if loc.Hidden {
+		err = s.repo.SaveOutlier(ctx, loc, prev.ID)
+	} else {
+		err = s.repo.Save(ctx, loc)
+	}
+	if err != nil {
 		if errors.Is(err, repository.ErrConflict) && input.ID != "" {
 			existing, getErr := s.repo.Get(ctx, id)
 			if getErr != nil {

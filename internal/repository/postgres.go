@@ -19,6 +19,9 @@ type postgres struct {
 //go:embed queries/save.sql
 var saveSQL string
 
+//go:embed queries/latest_valid.sql
+var latestValidSQL string
+
 func NewPostgres(db *pgxpool.Pool) Repository {
 	return &postgres{db: db}
 }
@@ -41,15 +44,10 @@ func (r *postgres) Get(ctx context.Context, id string) (*model.Location, error) 
 	return scanLocation(row)
 }
 
-// GetLatestValid returns the most recent non-hidden point for the given date.
+// GetLatestValid returns a non-hidden predecessor, never a newer offline point.
 // Returns nil (no error) when no valid point exists yet.
-func (r *postgres) GetLatestValid(ctx context.Context, date string) (*model.Location, error) {
-	row := r.db.QueryRow(ctx, `
-		SELECT id, latitude, longitude, accuracy, live_period, date, hidden, source::text, recorded_at
-		FROM locations
-		WHERE date = $1 AND NOT hidden
-		ORDER BY recorded_at DESC
-		LIMIT 1`, date)
+func (r *postgres) GetLatestValid(ctx context.Context, date string, before time.Time) (*model.Location, error) {
+	row := r.db.QueryRow(ctx, latestValidSQL, date, before)
 	loc, err := scanLocation(row)
 	if err == ErrNotFound {
 		return nil, nil
