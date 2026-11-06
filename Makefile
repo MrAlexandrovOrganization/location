@@ -127,6 +127,11 @@ compose-layout-check:
 
 check: compose-layout-check
 
+.PHONY: mobile-release-check
+mobile-release-check:
+	python3 -B -m unittest discover -s scripts -p 'test_mobile_*.py'
+check: mobile-release-check
+
 .PHONY: active-check
 active-check:
 	@test ! -e .retired || { echo "This stack has been retired" >&2; exit 1; }
