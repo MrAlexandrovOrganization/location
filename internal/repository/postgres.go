@@ -22,15 +22,43 @@ var saveSQL string
 //go:embed queries/reference.sql
 var referenceSQL string
 
+//go:embed queries/lock_points.sql
+var lockPointsSQL string
+
+//go:embed queries/get.sql
+var getSQL string
+
+//go:embed queries/list.sql
+var listSQL string
+
+//go:embed queries/delete.sql
+var deleteSQL string
+
 func NewPostgres(db *pgxpool.Pool) Repository {
 	return &postgres{db: db}
 }
 
 func (r *postgres) Save(ctx context.Context, loc *model.Location) error {
-	err := r.db.QueryRow(ctx, saveSQL,
-		loc.ID, loc.Latitude, loc.Longitude, loc.Accuracy,
-		loc.LivePeriod, loc.Date, loc.Hidden, loc.Source, loc.RecordedAt, loc.Provider, string(loc.QualityReason),
-	).Scan(&loc.Hidden)
+	var err error
+	if loc.MeasurementKey == "" {
+		err = savePoint(ctx, r.db, loc)
+	} else {
+		tx, e := r.db.Begin(ctx)
+		if e != nil {
+			return e
+		}
+		defer tx.Rollback(ctx)
+		if _, e = tx.Exec(ctx, lockPointsSQL); e != nil {
+			return e
+		}
+		if e = prepareMeasurement(ctx, tx, loc); e != nil {
+			return e
+		}
+		err = savePoint(ctx, tx, loc)
+		if err == nil {
+			return tx.Commit(ctx)
+		}
+	}
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ErrConflict
 	}
@@ -38,9 +66,7 @@ func (r *postgres) Save(ctx context.Context, loc *model.Location) error {
 }
 
 func (r *postgres) Get(ctx context.Context, id string) (*model.Location, error) {
-	row := r.db.QueryRow(ctx, `
-		SELECT id, latitude, longitude, accuracy, live_period, date, hidden, source::text, recorded_at, provider, quality_reason
-		FROM locations WHERE id = $1`, id)
+	row := r.db.QueryRow(ctx, getSQL, id)
 	return scanLocation(row)
 }
 
@@ -59,16 +85,7 @@ func scanReference(row scanner) (*model.Reference, error) {
 }
 
 func (r *postgres) ListByDate(ctx context.Context, date string, includeHidden bool) ([]*model.Location, error) {
-	query := `
-		SELECT id, latitude, longitude, accuracy, live_period, date, hidden, source::text, recorded_at, provider, quality_reason
-		FROM locations
-		WHERE date = $1`
-	if !includeHidden {
-		query += ` AND NOT hidden`
-	}
-	query += ` ORDER BY recorded_at ASC`
-
-	rows, err := r.db.Query(ctx, query, date)
+	rows, err := r.db.Query(ctx, listSQL, date, includeHidden)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +103,7 @@ func (r *postgres) ListByDate(ctx context.Context, date string, includeHidden bo
 }
 
 func (r *postgres) Delete(ctx context.Context, id string) error {
-	tag, err := r.db.Exec(ctx, `DELETE FROM locations WHERE id = $1`, id)
+	tag, err := r.db.Exec(ctx, deleteSQL, id)
 	if err != nil {
 		return err
 	}
@@ -115,5 +132,5 @@ func scanLocation(row scanner) (*model.Location, error) {
 func locationFields(loc *model.Location) []any {
 	return []any{&loc.ID, &loc.Latitude, &loc.Longitude, &loc.Accuracy,
 		&loc.LivePeriod, &loc.Date, &loc.Hidden, &loc.Source, &loc.RecordedAt,
-		&loc.Provider, &loc.QualityReason}
+		&loc.Provider, &loc.QualityReason, &loc.RawPayload, &loc.RawSHA256, &loc.MeasurementKey, &loc.MeasurementElapsedNS}
 }

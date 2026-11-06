@@ -62,6 +62,8 @@ func (s *svc) Save(ctx context.Context, input model.CreateInput) (*model.Locatio
 		RecordedAt: recordedAt,
 		Hidden:     false,
 		Provider:   provider,
+		RawPayload: input.RawPayload, RawSHA256: input.RawSHA256,
+		MeasurementKey: input.MeasurementKey, MeasurementElapsedNS: input.MeasurementElapsedNS,
 	}
 
 	// Compare against the last non-hidden point.
@@ -75,7 +77,9 @@ func (s *svc) Save(ctx context.Context, input model.CreateInput) (*model.Locatio
 	if reference != nil {
 		prev = reference.Point
 	}
-	if input.Accuracy > 500 {
+	if input.InputReason != "" {
+		loc.Hidden, loc.QualityReason = true, input.InputReason
+	} else if input.Accuracy > 500 {
 		loc.Hidden, loc.QualityReason = true, model.PoorAccuracy
 	} else if prev != nil {
 		dt := recordedAt.Sub(prev.RecordedAt).Seconds()
@@ -122,7 +126,10 @@ func (s *svc) Save(ctx context.Context, input model.CreateInput) (*model.Locatio
 			}
 			if existing.Latitude == loc.Latitude && existing.Longitude == loc.Longitude &&
 				existing.Accuracy == loc.Accuracy && existing.LivePeriod == loc.LivePeriod &&
-				existing.Date == loc.Date && existing.Source == loc.Source && existing.RecordedAt.Equal(loc.RecordedAt) {
+				existing.Date == loc.Date && existing.Source == loc.Source && existing.RecordedAt.Equal(loc.RecordedAt) && len(loc.RawPayload) == 0 && len(existing.RawPayload) == 0 {
+				return existing, nil
+			}
+			if len(loc.RawPayload) > 0 && existing.RawSHA256 == loc.RawSHA256 {
 				return existing, nil
 			}
 			return nil, repository.ErrConflict

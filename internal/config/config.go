@@ -8,11 +8,12 @@ import (
 )
 
 type Config struct {
-	Addr            string
-	PGURL           string
-	MetricsPort     string
-	MaxSpeedMS      float64
-	MobileTokenHash []byte
+	Addr             string
+	PGURL            string
+	MetricsPort      string
+	MaxSpeedMS       float64
+	MobileTokenHash  []byte
+	MobileReleaseDir string
 }
 
 func Load() (*Config, error) {
@@ -31,11 +32,12 @@ func Load() (*Config, error) {
 		}
 	}
 	return &Config{
-		Addr:            getenv("ADDR", ":8080"),
-		PGURL:           getenv("POSTGRES_URL", "postgres://location:location@localhost:5432/location?sslmode=disable"),
-		MetricsPort:     getenv("METRICS_PORT", "9104"),
-		MaxSpeedMS:      maxSpeed,
-		MobileTokenHash: mobileTokenHash,
+		Addr:             getenv("ADDR", ":8080"),
+		PGURL:            getenv("POSTGRES_URL", "postgres://location:location@localhost:5432/location?sslmode=disable"),
+		MetricsPort:      getenv("METRICS_PORT", "9104"),
+		MaxSpeedMS:       maxSpeed,
+		MobileTokenHash:  mobileTokenHash,
+		MobileReleaseDir: getenv("MOBILE_RELEASE_DIR", "/app/mobile-releases"),
 	}, nil
 }
 

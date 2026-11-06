@@ -319,3 +319,49 @@ provider подтверждается без изменения ранее со�
 1.1.0: он сохраняет GPS и сетевые измерения независимо и назначает UTC-время по
 системным часам телефона минус монотонный возраст фиксации. Уже сохранённая очередь
 сохраняет исходные UUID, измерения и время; её содержимое не переписывается.
+
+## Приём исходных измерений и обновления Android
+
+Начиная с APK 1.2.0 клиент только собирает и надёжно доставляет данные. Он не
+отбрасывает старые/повторные/неточные callback и не вычисляет исправленное время.
+`PUT /mobile/measurements/{uuid}` использует прежний mobile bearer, принимает JSON
+объект до 64 KiB и возвращает stored=true только после commit. Транспортные ошибки
+(JSON/размер/авторизация/UUID) дают 4xx. Неверные измерения сохраняются скрытыми
+с raw_payload и причиной, поэтому не блокируют очередь безвозвратно. Повтор UUID
+с тем же исходным телом идемпотентен; другое тело даёт 409. Старый API и старые
+очереди APK 1.0/1.1 продолжают работать без изменений.
+
+`internal/adapter` содержит отдельные адаптеры Android и Telegram. HTTP handlers
+выбирают адаптер и передают общий CreateInput в service.Save. Общий сервис не
+знает форматов фронтендов. Android timestamp рассчитывается на сервере из UTC
+получения callback минус монотонный возраст измерения; provider_time_ms остаётся
+в raw_payload. Возраст более двух минут даёт stale_measurement; неверные поля —
+invalid_measurement. Повтор монотонной метки в рамках installation/boot/provider —
+duplicate_measurement, более ранняя — out_of_order_measurement. При недоступном
+boot_count используется collection_session_id. Эти записи сохранены скрытыми,
+не становятся опорой и не создают доказательств для blacklist. Порядок проверяется
+под транзакционной блокировкой, после блокировки правил; повтор UUID не создаёт
+дополнительного наблюдения.
+
+Telegram frontend передаёт исходный location и message_date/edit_date в
+`POST /telegram/measurements` (внутренний API, как прежний POST /locations).
+Адаптер использует edit_date для live update, вычисляет логический день из
+переданного контекста timezone/day-start и назначает устойчивый UUID по update.
+Мобильный Android-адаптер сохраняет прежнюю UTC-дату. Общая проверка качества,
+скорости, опоры и blacklist одинакова для обоих источников. Notes-bot обновлять
+после backend. Миграция 009 сохраняет историю; received_at у старых строк NULL,
+а у новых — время приёма БД. raw_payload — исходные поля JSON, raw_sha256 — хэш
+исходного тела запроса. При неверных координатах нормализованные столбцы могут
+содержать 0; это hidden/invalid_measurement, а исходное значение остаётся в raw.
+
+`GET /mobile/app-update` и `/mobile/app-update/{sha256}.apk` требуют mobile bearer;
+без релиза manifest даёт 204. Разрешён только текущий APK, пути/redirect не
+принимаются. В `.mobile-releases/` (игнорируется Git) лежат APK/current.json и
+previous.json; каталог монтируется read-only в контейнер. Публикация из Android
+CI использует отдельный SSH key с restrict и forced command:
+`python3 /home/maxim/projects/backends/location/scripts/receive-mobile-release.py
+--directory /home/maxim/projects/backends/location/.mobile-releases`.
+Единственная принимаемая SSH команда — publish-mobile-release. Receiver ограничивает
+поток 64 MiB/180 сек, проверяет хэш/размер/версию/certificate identity и переключает
+manifest атомарно. Бинарник на VM не собирается. Откат выпускается с большим
+versionCode. Ключ подписи никогда не нужен backend и не хранится на VM.

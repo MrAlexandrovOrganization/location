@@ -13,6 +13,7 @@ WITH chosen AS MATERIALIZED (
 )
 SELECT c.id, c.latitude, c.longitude, c.accuracy, c.live_period, c.date, c.hidden,
        c.source::text, c.recorded_at, c.provider, c.quality_reason,
+       c.raw_payload, c.raw_sha256, c.measurement_key, c.measurement_elapsed_ns,
        c.accuracy > 0 AND c.accuracy <= 250
        AND c.recorded_at >= $1::timestamptz - interval '2 minutes'
        AND support.samples >= 2

@@ -43,15 +43,18 @@ func (r *postgres) SaveOutlier(ctx context.Context, loc *model.Location, referen
 	if _, err := tx.Exec(ctx, lockBlacklistSQL); err != nil {
 		return fmt.Errorf("lock outlier rules: %w", err)
 	}
-	err = tx.QueryRow(ctx, saveSQL,
-		loc.ID, loc.Latitude, loc.Longitude, loc.Accuracy,
-		loc.LivePeriod, loc.Date, loc.Hidden, loc.Source, loc.RecordedAt, loc.Provider, string(loc.QualityReason),
-	).Scan(&loc.Hidden)
+	if err = prepareMeasurement(ctx, tx, loc); err != nil {
+		return err
+	}
+	err = savePoint(ctx, tx, loc)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ErrConflict
 	}
 	if err != nil {
 		return err
+	}
+	if loc.QualityReason != reason {
+		return tx.Commit(ctx)
 	}
 	// Recheck after acquiring the rule lock and inserting the new hidden row.
 	// A retry/conflict has already exited; it must not create any new evidence.
