@@ -89,6 +89,10 @@ func (s *svc) Save(ctx context.Context, input model.CreateInput) (*model.Locatio
 				loc.QualityReason = model.SpeedOutlier
 				if dist >= 5000 && reference.Corroborated {
 					loc.QualityReason = model.CorroboratedJump
+				} else if dist >= 5000 && reference.CorroboratedPair && speed > math.Max(500, 5*s.maxSpeedMS) {
+					// Two agreeing fixes are enough only for an extreme jump. The
+					// absolute floor also protects against a very low speed setting.
+					loc.QualityReason = model.ExtremeJump
 				}
 				slog.Info("location hidden: outlier detected",
 					"speed_ms", fmt.Sprintf("%.1f", speed),
@@ -105,7 +109,7 @@ func (s *svc) Save(ctx context.Context, input model.CreateInput) (*model.Locatio
 		}
 	}
 
-	if loc.QualityReason == model.SpeedOutlier || loc.QualityReason == model.CorroboratedJump {
+	if loc.QualityReason == model.SpeedOutlier || loc.QualityReason == model.CorroboratedJump || loc.QualityReason == model.ExtremeJump {
 		err = s.repo.SaveOutlier(ctx, loc, prev.ID, loc.QualityReason)
 	} else {
 		err = s.repo.Save(ctx, loc)

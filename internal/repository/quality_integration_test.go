@@ -106,6 +106,125 @@ func TestLocationQuality(t *testing.T) {
 		}
 	})
 
+	for _, protection := range []string{"none", "visible visit", "disabled rule"} {
+		t.Run("extreme jump from two fixes with "+protection, func(t *testing.T) {
+			reset(t)
+			raw(t, "pair-1", 10, 20, when.Add(-110*time.Second), "unknown", 25)
+			raw(t, "pair-2", 10.00001, 20, when.Add(-53*time.Second), "unknown", 100)
+			if protection == "visible visit" {
+				raw(t, "earlier-visit", 10.3101, 20, when.Add(-24*time.Hour), "unknown", 20)
+			} else if protection == "disabled rule" {
+				if _, err := db.Exec(ctx, "INSERT INTO location_blacklist(latitude,longitude,enabled) VALUES(10.31,20,false)"); err != nil {
+					t.Fatal(err)
+				}
+			}
+			ref, err := repo.GetReference(ctx, when, "unknown")
+			if err != nil || ref == nil || ref.Corroborated || !ref.CorroboratedPair {
+				t.Fatal("pair confirmation", ref, err)
+			}
+			point := in("extreme", 10.31, 20, when, "unknown")
+			p, err := svc.Save(ctx, point)
+			if err != nil || !p.Hidden || p.QualityReason != model.ExtremeJump {
+				t.Fatalf("extreme classification: %+v %v", p, err)
+			}
+			wantRules := 0
+			if protection == "none" {
+				wantRules = 1
+			}
+			if count(t, "SELECT count(*) FROM location_blacklist WHERE enabled AND radius_m=0") != wantRules {
+				t.Fatal("immediate rule or protection missing")
+			}
+			if _, err := svc.Save(ctx, point); err != nil {
+				t.Fatal("extreme retry", err)
+			}
+			if count(t, "SELECT count(*) FROM location_outlier_observations") != 1 {
+				t.Fatal("retry duplicated evidence")
+			}
+			p, err = svc.Save(ctx, in("return-to-pair", 10.00001, 20, when.Add(6*time.Second), "unknown"))
+			if err != nil || p.Hidden {
+				t.Fatal("extreme jump displaced the correct reference", err)
+			}
+		})
+	}
+
+	for _, support := range []string{"hidden", "poor accuracy", "different provider", "too recent", "too old", "far away", "stale reference"} {
+		t.Run("extreme jump needs usable support: "+support, func(t *testing.T) {
+			reset(t)
+			s := raw(t, "support", 10, 20, when.Add(-110*time.Second), "unknown", 25)
+			anchorAt := when.Add(-53 * time.Second)
+			switch support {
+			case "hidden":
+				_, err := db.Exec(ctx, "UPDATE locations SET hidden=true WHERE id=$1", s.ID)
+				if err != nil {
+					t.Fatal(err)
+				}
+			case "poor accuracy":
+				_, err := db.Exec(ctx, "UPDATE locations SET accuracy=400 WHERE id=$1", s.ID)
+				if err != nil {
+					t.Fatal(err)
+				}
+			case "different provider":
+				_, err := db.Exec(ctx, "UPDATE locations SET provider='gps' WHERE id=$1", s.ID)
+				if err != nil {
+					t.Fatal(err)
+				}
+			case "too recent":
+				_, err := db.Exec(ctx, "UPDATE locations SET recorded_at=$2 WHERE id=$1", s.ID, anchorAt.Add(-10*time.Second))
+				if err != nil {
+					t.Fatal(err)
+				}
+			case "too old":
+				_, err := db.Exec(ctx, "UPDATE locations SET recorded_at=$2 WHERE id=$1", s.ID, anchorAt.Add(-4*time.Minute))
+				if err != nil {
+					t.Fatal(err)
+				}
+			case "far away":
+				_, err := db.Exec(ctx, "UPDATE locations SET latitude=10.01 WHERE id=$1", s.ID)
+				if err != nil {
+					t.Fatal(err)
+				}
+			case "stale reference":
+				anchorAt = when.Add(-130 * time.Second)
+				_, err := db.Exec(ctx, "UPDATE locations SET recorded_at=$2 WHERE id=$1", s.ID, anchorAt.Add(-time.Minute))
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			raw(t, "anchor", 10, 20, anchorAt, "unknown", 100)
+			ref, err := repo.GetReference(ctx, when, "unknown")
+			if err != nil || ref == nil || ref.CorroboratedPair {
+				t.Fatal("unusable support confirmed a pair", ref, err)
+			}
+			p, err := svc.Save(ctx, in("unconfirmed", 10.61, 20, when, "unknown"))
+			if err != nil || !p.Hidden || p.QualityReason != model.SpeedOutlier {
+				t.Fatalf("unconfirmed extreme jump: %+v %v", p, err)
+			}
+			if count(t, "SELECT count(*) FROM location_blacklist") != 0 {
+				t.Fatal("unconfirmed point permanently banned")
+			}
+		})
+	}
+
+	t.Run("lost pair confirmation rolls back the immediate rule", func(t *testing.T) {
+		reset(t)
+		raw(t, "support", 10, 20, when.Add(-110*time.Second), "unknown", 25)
+		raw(t, "anchor", 10, 20, when.Add(-53*time.Second), "unknown", 100)
+		ref, err := repo.GetReference(ctx, when, "unknown")
+		if err != nil || ref == nil || !ref.CorroboratedPair {
+			t.Fatal("missing initial pair", err)
+		}
+		if _, err := db.Exec(ctx, "UPDATE locations SET hidden=true WHERE id='support'"); err != nil {
+			t.Fatal(err)
+		}
+		p := &model.Location{ID: "lost-pair", Latitude: 10.31, Longitude: 20, Accuracy: 7, Source: "android", Date: when.Format("2006-01-02"), RecordedAt: when, Hidden: true}
+		if err := repo.SaveOutlier(ctx, p, ref.Point.ID, model.ExtremeJump); err == nil {
+			t.Fatal("lost confirmation accepted")
+		}
+		if count(t, "SELECT count(*) FROM locations WHERE id='lost-pair'") != 0 || count(t, "SELECT count(*) FROM location_outlier_observations") != 0 || count(t, "SELECT count(*) FROM location_blacklist") != 0 {
+			t.Fatal("stale confirmation left partial data")
+		}
+	})
+
 	for _, hasVisit := range []bool{false, true} {
 		name := "immediate promotion respects manual opt-out"
 		if hasVisit {

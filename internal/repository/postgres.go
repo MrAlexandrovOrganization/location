@@ -50,7 +50,7 @@ func (r *postgres) GetReference(ctx context.Context, before time.Time, provider 
 
 func scanReference(row scanner) (*model.Reference, error) {
 	ref := &model.Reference{Point: &model.Location{}}
-	fields := append(locationFields(ref.Point), &ref.Corroborated)
+	fields := append(locationFields(ref.Point), &ref.Corroborated, &ref.CorroboratedPair)
 	err := row.Scan(fields...)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil

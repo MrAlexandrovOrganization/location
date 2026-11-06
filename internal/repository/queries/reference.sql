@@ -15,12 +15,19 @@ SELECT c.id, c.latitude, c.longitude, c.accuracy, c.live_period, c.date, c.hidde
        c.source::text, c.recorded_at, c.provider, c.quality_reason,
        c.accuracy > 0 AND c.accuracy <= 250
        AND c.recorded_at >= $1::timestamptz - interval '2 minutes'
-       AND (SELECT count(*) >= 2 AND min(p.recorded_at) <= c.recorded_at - interval '30 seconds'
-            FROM public.locations p
-            WHERE NOT p.hidden AND p.provider = c.provider
-              AND p.accuracy > 0 AND p.accuracy <= 250
-              AND p.recorded_at < c.recorded_at
-              AND p.recorded_at >= c.recorded_at - interval '3 minutes'
-              AND public.location_distance_m(p.latitude,p.longitude,c.latitude,c.longitude) <= 250
-       ) AS corroborated
-FROM chosen c;
+       AND support.samples >= 2
+       AND support.first_at <= c.recorded_at - interval '30 seconds' AS corroborated,
+       c.accuracy > 0 AND c.accuracy <= 250
+       AND c.recorded_at >= $1::timestamptz - interval '2 minutes'
+       AND support.samples >= 1
+       AND support.first_at <= c.recorded_at - interval '30 seconds' AS corroborated_pair
+FROM chosen c
+CROSS JOIN LATERAL (
+    SELECT count(*) AS samples, min(p.recorded_at) AS first_at
+    FROM public.locations p
+    WHERE NOT p.hidden AND p.provider = c.provider
+      AND p.accuracy > 0 AND p.accuracy <= 250
+      AND p.recorded_at < c.recorded_at
+      AND p.recorded_at >= c.recorded_at - interval '3 minutes'
+      AND public.location_distance_m(p.latitude,p.longitude,c.latitude,c.longitude) <= 250
+) support;

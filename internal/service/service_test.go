@@ -17,6 +17,7 @@ type referenceRepository struct {
 	outliers     int
 	reference    string
 	corroborated bool
+	paired       bool
 	reason       model.QualityReason
 }
 
@@ -32,7 +33,7 @@ func (r *referenceRepository) GetReference(_ context.Context, before time.Time, 
 	if r.prev == nil {
 		return nil, r.err
 	}
-	return &model.Reference{Point: r.prev, Corroborated: r.corroborated}, r.err
+	return &model.Reference{Point: r.prev, Corroborated: r.corroborated, CorroboratedPair: r.paired}, r.err
 }
 
 func TestLargeJumpDoesNotBecomeAReferenceOrEvidence(t *testing.T) {
@@ -58,6 +59,33 @@ func TestCoarseFixDoesNotBecomeSpeedEvidence(t *testing.T) {
 	got, err := New(r, nil, 100).Save(context.Background(), model.CreateInput{Accuracy: 1000})
 	if err != nil || !got.Hidden || got.QualityReason != model.PoorAccuracy || r.outliers != 0 {
 		t.Fatalf("coarse fix: %+v %v", got, err)
+	}
+}
+
+func TestExtremeJumpRequiresBothSpeedFloorsAndAStablePair(t *testing.T) {
+	when := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
+	for _, tt := range []struct {
+		name     string
+		latitude float64
+		age      time.Duration
+		limit    float64
+		paired   bool
+		want     model.QualityReason
+	}{
+		{"extreme jump from pair", 10.31, 53 * time.Second, 100, true, model.ExtremeJump},
+		{"single reference is insufficient", 10.31, 53 * time.Second, 100, false, model.SpeedOutlier},
+		{"ordinary speed violation", 10.10, 53 * time.Second, 100, true, model.SpeedOutlier},
+		{"absolute floor protects low configured limit", 10.10, 53 * time.Second, 10, true, model.SpeedOutlier},
+		{"relative floor protects high configured limit", 10.31, 53 * time.Second, 250, true, model.SpeedOutlier},
+		{"short distance stays ordinary", 10.01, time.Second, 100, true, model.SpeedOutlier},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			r := &referenceRepository{paired: tt.paired, prev: &model.Location{ID: "reference", Latitude: 10, Longitude: 20, Accuracy: 100, RecordedAt: when.Add(-tt.age)}}
+			p, err := New(r, nil, tt.limit).Save(context.Background(), model.CreateInput{Latitude: tt.latitude, Longitude: 20, Accuracy: 7, RecordedAt: when})
+			if err != nil || !p.Hidden || p.QualityReason != tt.want || r.reason != tt.want || r.outliers != 1 {
+				t.Fatalf("classification: %+v, reason=%s, err=%v", p, r.reason, err)
+			}
+		})
 	}
 }
 func (*referenceRepository) Get(context.Context, string) (*model.Location, error) { panic("unused") }
