@@ -5,7 +5,27 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
+
+type deadlineWriter struct {
+	*httptest.ResponseRecorder
+	deadline time.Time
+}
+
+func (w *deadlineWriter) SetWriteDeadline(deadline time.Time) error {
+	w.deadline = deadline
+	return nil
+}
+
+func TestDownloadDeadlineSurvivesMetricsWrapper(t *testing.T) {
+	writer := &deadlineWriter{ResponseRecorder: httptest.NewRecorder()}
+	deadline := time.Now().Add(2 * time.Minute)
+	err := http.NewResponseController(&responseWriter{ResponseWriter: writer}).SetWriteDeadline(deadline)
+	if err != nil || !writer.deadline.Equal(deadline) {
+		t.Fatal("download deadline not delegated", err)
+	}
+}
 
 func TestMobileMetricsUseRouteInsteadOfPointIdentity(t *testing.T) {
 	export, shutdown, err := Init()

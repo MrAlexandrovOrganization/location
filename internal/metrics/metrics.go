@@ -133,6 +133,9 @@ type responseWriter struct {
 	status int
 }
 
+// Unwrap preserves ResponseController capabilities for bounded APK downloads.
+func (rw *responseWriter) Unwrap() http.ResponseWriter { return rw.ResponseWriter }
+
 func (rw *responseWriter) WriteHeader(code int) {
 	rw.status = code
 	rw.ResponseWriter.WriteHeader(code)
