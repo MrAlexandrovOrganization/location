@@ -25,7 +25,7 @@ func TestPostgresBlacklist(t *testing.T) {
 	repo := repository.NewPostgres(db)
 	reset := func(t *testing.T) {
 		t.Helper()
-		if _, err := db.Exec(ctx, "TRUNCATE locations, location_blacklist RESTART IDENTITY"); err != nil {
+		if _, err := db.Exec(ctx, "TRUNCATE location_outlier_observations, locations, location_blacklist RESTART IDENTITY"); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -92,7 +92,7 @@ func TestPostgresBlacklist(t *testing.T) {
 		if err != nil || len(visible) != 0 {
 			t.Fatalf("blacklisted point leaked into list: %v %v", visible, err)
 		}
-		latest, err := repo.GetLatestValid(ctx, point.Date)
+		latest, err := repo.GetLatestValid(ctx, point.Date, point.RecordedAt.Add(time.Second))
 		if err != nil || latest != nil {
 			t.Fatal("blacklisted point was used by the velocity filter")
 		}
