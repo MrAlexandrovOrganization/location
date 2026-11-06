@@ -21,6 +21,7 @@ type QualityReason string
 const (
 	SpeedOutlier     QualityReason = "speed"
 	CorroboratedJump QualityReason = "corroborated_jump"
+	ExtremeJump      QualityReason = "extreme_jump"
 	UncertainJump    QualityReason = "uncertain_jump"
 	PoorAccuracy     QualityReason = "poor_accuracy"
 )
@@ -28,6 +29,9 @@ const (
 type Reference struct {
 	Point        *Location
 	Corroborated bool
+	// CorroboratedPair has one earlier supporting fix instead of two.
+	// It only permits immediate rules for extreme speeds, not ordinary outliers.
+	CorroboratedPair bool
 }
 
 func ValidProvider(provider string) bool {
