@@ -92,7 +92,7 @@ func TestPostgresBlacklist(t *testing.T) {
 		if err != nil || len(visible) != 0 {
 			t.Fatalf("blacklisted point leaked into list: %v %v", visible, err)
 		}
-		latest, err := repo.GetLatestValid(ctx, point.Date, point.RecordedAt.Add(time.Second))
+		latest, err := repo.GetReference(ctx, point.RecordedAt.Add(time.Second), "unknown")
 		if err != nil || latest != nil {
 			t.Fatal("blacklisted point was used by the velocity filter")
 		}

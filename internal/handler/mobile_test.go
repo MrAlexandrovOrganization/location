@@ -48,6 +48,8 @@ func TestMobileIngestion(t *testing.T) {
 		{name: "missing coordinates", body: `{"recorded_at":"2026-10-01T10:11:12Z"}`, token: "synthetic-device-token", want: 400},
 		{name: "invalid range", body: strings.Replace(validPoint, `"latitude":0`, `"latitude":91`, 1), token: "synthetic-device-token", want: 400},
 		{name: "negative accuracy", body: strings.Replace(validPoint, `4.5`, `-1`, 1), token: "synthetic-device-token", want: 400},
+		{name: "provider metadata", body: strings.Replace(validPoint, `"latitude"`, `"provider":"network","latitude"`, 1), token: "synthetic-device-token", want: 200},
+		{name: "invalid provider", body: strings.Replace(validPoint, `"latitude"`, `"provider":"custom","latitude"`, 1), token: "synthetic-device-token", want: 400},
 		{name: "unknown fields", body: strings.Replace(validPoint, `"latitude"`, `"source":"telegram-bot","latitude"`, 1), token: "synthetic-device-token", want: 400},
 		{name: "trailing JSON", body: validPoint + `{}`, token: "synthetic-device-token", want: 400},
 		{name: "huge input", body: strings.Repeat(" ", 4097) + validPoint, token: "synthetic-device-token", want: 400},

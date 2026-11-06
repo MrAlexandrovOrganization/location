@@ -1,5 +1,6 @@
 -- $1: newly stored observation, $2: minimum samples, $3: distinct Moscow days,
--- $4: neighbourhood radius in metres. Rules themselves always remain exact.
+-- $4: neighbourhood radius in metres, $5: a corroborated impossible jump.
+-- Rules themselves always remain exact; uncertain large jumps are not evidence.
 WITH candidate AS (
     SELECT latitude, longitude
     FROM public.locations WHERE id = $1 AND hidden
@@ -16,7 +17,7 @@ WITH candidate AS (
 )
 SELECT EXISTS (
     SELECT FROM candidate c CROSS JOIN evidence e
-    WHERE e.samples >= $2 AND e.days >= $3
+    WHERE ($5::boolean OR (e.samples >= $2 AND e.days >= $3))
       AND NOT EXISTS (
           SELECT FROM public.locations l
           WHERE NOT l.hidden

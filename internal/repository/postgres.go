@@ -19,8 +19,8 @@ type postgres struct {
 //go:embed queries/save.sql
 var saveSQL string
 
-//go:embed queries/latest_valid.sql
-var latestValidSQL string
+//go:embed queries/reference.sql
+var referenceSQL string
 
 func NewPostgres(db *pgxpool.Pool) Repository {
 	return &postgres{db: db}
@@ -29,7 +29,7 @@ func NewPostgres(db *pgxpool.Pool) Repository {
 func (r *postgres) Save(ctx context.Context, loc *model.Location) error {
 	err := r.db.QueryRow(ctx, saveSQL,
 		loc.ID, loc.Latitude, loc.Longitude, loc.Accuracy,
-		loc.LivePeriod, loc.Date, loc.Hidden, loc.Source, loc.RecordedAt,
+		loc.LivePeriod, loc.Date, loc.Hidden, loc.Source, loc.RecordedAt, loc.Provider, string(loc.QualityReason),
 	).Scan(&loc.Hidden)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ErrConflict
@@ -39,25 +39,28 @@ func (r *postgres) Save(ctx context.Context, loc *model.Location) error {
 
 func (r *postgres) Get(ctx context.Context, id string) (*model.Location, error) {
 	row := r.db.QueryRow(ctx, `
-		SELECT id, latitude, longitude, accuracy, live_period, date, hidden, source::text, recorded_at
+		SELECT id, latitude, longitude, accuracy, live_period, date, hidden, source::text, recorded_at, provider, quality_reason
 		FROM locations WHERE id = $1`, id)
 	return scanLocation(row)
 }
 
-// GetLatestValid returns a non-hidden predecessor, never a newer offline point.
-// Returns nil (no error) when no valid point exists yet.
-func (r *postgres) GetLatestValid(ctx context.Context, date string, before time.Time) (*model.Location, error) {
-	row := r.db.QueryRow(ctx, latestValidSQL, date, before)
-	loc, err := scanLocation(row)
-	if err == ErrNotFound {
+func (r *postgres) GetReference(ctx context.Context, before time.Time, provider string) (*model.Reference, error) {
+	return scanReference(r.db.QueryRow(ctx, referenceSQL, before, provider))
+}
+
+func scanReference(row scanner) (*model.Reference, error) {
+	ref := &model.Reference{Point: &model.Location{}}
+	fields := append(locationFields(ref.Point), &ref.Corroborated)
+	err := row.Scan(fields...)
+	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
-	return loc, err
+	return ref, err
 }
 
 func (r *postgres) ListByDate(ctx context.Context, date string, includeHidden bool) ([]*model.Location, error) {
 	query := `
-		SELECT id, latitude, longitude, accuracy, live_period, date, hidden, source::text, recorded_at
+		SELECT id, latitude, longitude, accuracy, live_period, date, hidden, source::text, recorded_at, provider, quality_reason
 		FROM locations
 		WHERE date = $1`
 	if !includeHidden {
@@ -99,17 +102,18 @@ type scanner interface {
 
 func scanLocation(row scanner) (*model.Location, error) {
 	var loc model.Location
-	var recordedAt time.Time
-	err := row.Scan(
-		&loc.ID, &loc.Latitude, &loc.Longitude, &loc.Accuracy,
-		&loc.LivePeriod, &loc.Date, &loc.Hidden, &loc.Source, &recordedAt,
-	)
+	err := row.Scan(locationFields(&loc)...)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, ErrNotFound
 		}
 		return nil, fmt.Errorf("scan location: %w", err)
 	}
-	loc.RecordedAt = recordedAt
 	return &loc, nil
+}
+
+func locationFields(loc *model.Location) []any {
+	return []any{&loc.ID, &loc.Latitude, &loc.Longitude, &loc.Accuracy,
+		&loc.LivePeriod, &loc.Date, &loc.Hidden, &loc.Source, &loc.RecordedAt,
+		&loc.Provider, &loc.QualityReason}
 }

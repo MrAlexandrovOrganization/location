@@ -51,7 +51,8 @@ func TestConfirmedOutliers(t *testing.T) {
 	reject := func(t *testing.T, id string, when time.Time) model.CreateInput {
 		t.Helper()
 		in := input(t, id, when)
-		p, err := svc.Save(ctx, in)
+		p := &model.Location{ID: in.ID, Latitude: in.Latitude, Longitude: in.Longitude, Accuracy: in.Accuracy, Date: in.Date, Source: in.Source, RecordedAt: in.RecordedAt, Hidden: true}
+		err := repo.SaveOutlier(ctx, p, id+"-reference", model.SpeedOutlier)
 		if err != nil || !p.Hidden {
 			t.Fatalf("rejection: %+v %v", p, err)
 		}
@@ -165,7 +166,7 @@ CREATE TRIGGER fail_auto_rule BEFORE INSERT ON location_blacklist FOR EACH ROW E
 		for i := range 2 {
 			go func() {
 				p := &model.Location{ID: fmt.Sprintf("concurrent-%d", i), Latitude: in.Latitude, Longitude: in.Longitude, Accuracy: in.Accuracy, Date: in.Date, Source: in.Source, RecordedAt: in.RecordedAt, Hidden: true}
-				results <- repo.SaveOutlier(ctx, p, "concurrent-reference")
+				results <- repo.SaveOutlier(ctx, p, "concurrent-reference", model.SpeedOutlier)
 			}()
 		}
 		for range 2 {
