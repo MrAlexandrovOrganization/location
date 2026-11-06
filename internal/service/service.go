@@ -46,6 +46,10 @@ func (s *svc) Save(ctx context.Context, input model.CreateInput) (*model.Locatio
 	if source == "" {
 		source = "unknown"
 	}
+	provider := input.Provider
+	if provider == "" {
+		provider = "unknown"
+	}
 
 	loc := &model.Location{
 		ID:         id,
@@ -57,33 +61,52 @@ func (s *svc) Save(ctx context.Context, input model.CreateInput) (*model.Locatio
 		Source:     source,
 		RecordedAt: recordedAt,
 		Hidden:     false,
+		Provider:   provider,
 	}
 
 	// Compare against the last non-hidden point.
 	// This handles consecutive outliers: each outlier is always compared
 	// to the last valid point, not to the previous outlier.
-	prev, err := s.repo.GetLatestValid(ctx, input.Date, recordedAt)
+	reference, err := s.repo.GetReference(ctx, recordedAt, provider)
 	if err != nil {
 		return nil, fmt.Errorf("find location reference: %w", err)
 	}
-	if prev != nil {
+	var prev *model.Location
+	if reference != nil {
+		prev = reference.Point
+	}
+	if input.Accuracy > 500 {
+		loc.Hidden, loc.QualityReason = true, model.PoorAccuracy
+	} else if prev != nil {
 		dt := recordedAt.Sub(prev.RecordedAt).Seconds()
 		if dt > 0 {
 			dist := haversineMeters(prev.Latitude, prev.Longitude, input.Latitude, input.Longitude)
-			speed := dist / dt
+			// Reported uncertainty is an allowance, not proof of authenticity.
+			minimumDistance := math.Max(0, dist-float64(prev.Accuracy)-float64(input.Accuracy))
+			speed := minimumDistance / dt
 			if speed > s.maxSpeedMS {
 				loc.Hidden = true
+				loc.QualityReason = model.SpeedOutlier
+				if dist >= 5000 && reference.Corroborated {
+					loc.QualityReason = model.CorroboratedJump
+				}
 				slog.Info("location hidden: outlier detected",
 					"speed_ms", fmt.Sprintf("%.1f", speed),
 					"dist_m", fmt.Sprintf("%.0f", dist),
 					"dt_s", fmt.Sprintf("%.1f", dt),
 				)
+			} else if dist >= 5000 {
+				freshNetwork := prev.Provider == "network" && prev.Accuracy > 0 && prev.Accuracy <= 250 && dt <= 120
+				incomingNetwork := provider == "network" && input.Accuracy > 0 && input.Accuracy <= 250
+				if !freshNetwork && !incomingNetwork {
+					loc.Hidden, loc.QualityReason = true, model.UncertainJump
+				}
 			}
 		}
 	}
 
-	if loc.Hidden {
-		err = s.repo.SaveOutlier(ctx, loc, prev.ID)
+	if loc.QualityReason == model.SpeedOutlier || loc.QualityReason == model.CorroboratedJump {
+		err = s.repo.SaveOutlier(ctx, loc, prev.ID, loc.QualityReason)
 	} else {
 		err = s.repo.Save(ctx, loc)
 	}
@@ -135,5 +158,6 @@ func haversineMeters(lat1, lon1, lat2, lon2 float64) float64 {
 	dLon := (lon2 - lon1) * math.Pi / 180
 	a := math.Sin(dLat/2)*math.Sin(dLat/2) +
 		math.Cos(phi1)*math.Cos(phi2)*math.Sin(dLon/2)*math.Sin(dLon/2)
+	a = math.Min(1, math.Max(0, a))
 	return R * 2 * math.Atan2(math.Sqrt(a), math.Sqrt(1-a))
 }

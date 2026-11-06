@@ -46,6 +46,7 @@ func (h *Handler) RegisterMobile(mux *http.ServeMux, tokenHash []byte) {
 			Longitude  *float64  `json:"longitude"`
 			Accuracy   *float32  `json:"accuracy"`
 			RecordedAt time.Time `json:"recorded_at"`
+			Provider   string    `json:"provider"`
 		}
 		r.Body = http.MaxBytesReader(w, r.Body, 4096)
 		decoder := json.NewDecoder(r.Body)
@@ -57,14 +58,14 @@ func (h *Handler) RegisterMobile(mux *http.ServeMux, tokenHash []byte) {
 		if decoder.Decode(new(any)) != io.EOF || body.Latitude == nil || body.Longitude == nil || body.Accuracy == nil ||
 			math.IsNaN(*body.Latitude) || math.IsInf(*body.Latitude, 0) || math.Abs(*body.Latitude) > 90 ||
 			math.IsNaN(*body.Longitude) || math.IsInf(*body.Longitude, 0) || math.Abs(*body.Longitude) > 180 ||
-			math.IsNaN(float64(*body.Accuracy)) || math.IsInf(float64(*body.Accuracy), 0) || *body.Accuracy < 0 ||
+			math.IsNaN(float64(*body.Accuracy)) || math.IsInf(float64(*body.Accuracy), 0) || *body.Accuracy < 0 || !model.ValidProvider(body.Provider) ||
 			body.RecordedAt.Before(time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)) || body.RecordedAt.After(time.Now().Add(24*time.Hour)) {
 			writeErr(r.Context(), w, http.StatusBadRequest, "invalid point")
 			return
 		}
 		loc, err := h.svc.Save(r.Context(), model.CreateInput{
 			ID: id, Latitude: *body.Latitude, Longitude: *body.Longitude, Accuracy: *body.Accuracy,
-			RecordedAt: body.RecordedAt, Date: body.RecordedAt.UTC().Format("2006-01-02"), Source: "android",
+			RecordedAt: body.RecordedAt, Date: body.RecordedAt.UTC().Format("2006-01-02"), Source: "android", Provider: body.Provider,
 		})
 		if errors.Is(err, repository.ErrConflict) {
 			writeErr(r.Context(), w, http.StatusConflict, "id belongs to another point")
