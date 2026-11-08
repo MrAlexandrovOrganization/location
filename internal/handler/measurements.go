@@ -3,10 +3,8 @@ package handler
 import (
 	"crypto/sha256"
 	"crypto/subtle"
-	"encoding/json"
 	"errors"
 	"io"
-	"location/internal/adapter"
 	"net/http"
 	"strings"
 	"time"
@@ -46,13 +44,11 @@ func (h *Handler) RegisterMeasurements(mux *http.ServeMux, tokenHash []byte) {
 			return
 		}
 		raw, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 65536))
-		var fields map[string]json.RawMessage
-		if err != nil || json.Unmarshal(raw, &fields) != nil || fields == nil {
+		input, inputErr := measurementInput(id, raw, time.Now())
+		if err != nil || inputErr != nil {
 			writeErr(r.Context(), w, 400, "expected a JSON measurement object")
 			return
 		}
-		input := adapter.Android(raw, time.Now())
-		input.ID = id
 		loc, err := h.svc.Save(r.Context(), input)
 		if errors.Is(err, repository.ErrConflict) {
 			writeErr(r.Context(), w, 409, "id belongs to another measurement")

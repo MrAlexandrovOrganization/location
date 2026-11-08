@@ -14,11 +14,12 @@ import (
 )
 
 type Handler struct {
-	svc service.Service
+	svc        service.Service
+	batchSlots chan struct{}
 }
 
 func New(svc service.Service) *Handler {
-	return &Handler{svc: svc}
+	return &Handler{svc: svc, batchSlots: make(chan struct{}, 1)}
 }
 
 func (h *Handler) Register(mux *http.ServeMux) {

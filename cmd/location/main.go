@@ -81,6 +81,7 @@ func main() {
 	h.RegisterTelegram(mux)
 	h.RegisterMobile(mux, cfg.MobileTokenHash)
 	h.RegisterMeasurements(mux, cfg.MobileTokenHash)
+	h.RegisterBatches(mux, cfg.MobileTokenHash)
 	h.RegisterUpdates(mux, cfg.MobileTokenHash, cfg.MobileReleaseDir)
 	mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
