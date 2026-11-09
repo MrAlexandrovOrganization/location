@@ -269,12 +269,42 @@ func TestLocationQuality(t *testing.T) {
 		coarse := in("coarse", 10.14, 20.00, when, "network")
 		coarse.Accuracy = 2000
 		p, err := svc.Save(ctx, coarse)
-		if err != nil || !p.Hidden || p.QualityReason != model.PoorAccuracy {
+		if err != nil || p.Hidden || p.QualityReason != model.PoorAccuracy {
 			t.Fatal("coarse point discarded or promoted", err)
 		}
 		ref, err := repo.GetReference(ctx, when.Add(time.Second), "network")
 		if err != nil || ref.Point.ID != "good" {
 			t.Fatal("coarse point became a reference", err)
+		}
+		if count(t, "SELECT count(*) FROM location_outlier_observations") != 0 || count(t, "SELECT count(*) FROM location_blacklist") != 0 {
+			t.Fatal("visible coarse point created permanent evidence")
+		}
+	})
+
+	t.Run("visible quality warnings cannot be anchors or supporting fixes", func(t *testing.T) {
+		for _, reason := range []model.QualityReason{model.StaleMeasurement, model.PoorAccuracy, model.UncertainJump} {
+			t.Run(string(reason), func(t *testing.T) {
+				reset(t)
+				support := raw(t, "flagged-support", 10, 20, when.Add(-110*time.Second), "network", 20)
+				if _, err := db.Exec(ctx, "UPDATE locations SET quality_reason=$2 WHERE id=$1", support.ID, string(reason)); err != nil {
+					t.Fatal(err)
+				}
+				if ref, err := repo.GetReference(ctx, when, "network"); err != nil || ref != nil {
+					t.Fatal("visible warning became an anchor", ref, err)
+				}
+				raw(t, "anchor", 10, 20, when.Add(-53*time.Second), "network", 100)
+				ref, err := repo.GetReference(ctx, when, "network")
+				if err != nil || ref == nil || ref.Point.ID != "anchor" || ref.CorroboratedPair || ref.Corroborated {
+					t.Fatal("visible warning confirmed an anchor", ref, err)
+				}
+				p, err := svc.Save(ctx, in("jump", 10.31, 20, when, "network"))
+				if err != nil || !p.Hidden || p.QualityReason != model.SpeedOutlier {
+					t.Fatal("speed rejection lost after excluding warnings", p, err)
+				}
+				if count(t, "SELECT count(*) FROM location_blacklist") != 0 {
+					t.Fatal("visible warning enabled an immediate permanent rule")
+				}
+			})
 		}
 	})
 

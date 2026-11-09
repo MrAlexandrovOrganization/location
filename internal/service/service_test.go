@@ -57,8 +57,31 @@ func TestCorroboratedImpossibleJumpCanBeBlacklistedImmediately(t *testing.T) {
 func TestCoarseFixDoesNotBecomeSpeedEvidence(t *testing.T) {
 	r := &referenceRepository{}
 	got, err := New(r, nil, 100).Save(context.Background(), model.CreateInput{Accuracy: 1000})
-	if err != nil || !got.Hidden || got.QualityReason != model.PoorAccuracy || r.outliers != 0 {
+	if err != nil || got.Hidden || got.QualityReason != model.PoorAccuracy || r.outliers != 0 {
 		t.Fatalf("coarse fix: %+v %v", got, err)
+	}
+}
+
+func TestQualityWarningsAloneDoNotHideOrCreateSpeedEvidence(t *testing.T) {
+	when := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
+	for _, tt := range []struct {
+		name   string
+		reason model.QualityReason
+		hidden bool
+	}{
+		{"delayed callback", model.StaleMeasurement, false},
+		{"coarse input", model.PoorAccuracy, false},
+		{"invalid input", model.InvalidMeasurement, true},
+		{"duplicate", model.DuplicateMeasurement, true},
+		{"out of order", model.OutOfOrderMeasurement, true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			r := &referenceRepository{corroborated: true, prev: &model.Location{ID: "reference", Latitude: 10, Longitude: 20, Accuracy: 5, RecordedAt: when.Add(-time.Second)}}
+			got, err := New(r, nil, 100).Save(context.Background(), model.CreateInput{Latitude: 30, Longitude: 40, Accuracy: 5, RecordedAt: when, InputReason: tt.reason})
+			if err != nil || got.Hidden != tt.hidden || got.QualityReason != tt.reason || r.normal != 1 || r.outliers != 0 {
+				t.Fatalf("input quality changed visibility or created evidence: %+v, err=%v", got, err)
+			}
+		})
 	}
 }
 

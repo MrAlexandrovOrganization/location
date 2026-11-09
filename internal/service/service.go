@@ -78,9 +78,12 @@ func (s *svc) Save(ctx context.Context, input model.CreateInput) (*model.Locatio
 		prev = reference.Point
 	}
 	if input.InputReason != "" {
-		loc.Hidden, loc.QualityReason = true, input.InputReason
+		loc.QualityReason = input.InputReason
+		// Callback delay and uncertainty describe quality, not whether a
+		// historical position was wrong. Keep them visible but out of anchors.
+		loc.Hidden = input.InputReason != model.StaleMeasurement && input.InputReason != model.PoorAccuracy
 	} else if input.Accuracy > 500 {
-		loc.Hidden, loc.QualityReason = true, model.PoorAccuracy
+		loc.QualityReason = model.PoorAccuracy
 	} else if prev != nil {
 		dt := recordedAt.Sub(prev.RecordedAt).Seconds()
 		if dt > 0 {
