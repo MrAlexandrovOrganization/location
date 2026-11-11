@@ -1,0 +1,10 @@
+version: v2
+inputs:
+  - directory: proto
+plugins:
+  - local: .bin/protoc-gen-go
+    out: .
+    opt: [module=location]
+  - local: .bin/protoc-gen-go-grpc
+    out: .
+    opt: [module=location]

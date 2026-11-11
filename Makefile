@@ -10,7 +10,7 @@ export
 include makefiles/versions.mk
 
 .PHONY: build
-build:
+build: proto-gen
 	go build -o $(BINARY) ./cmd/location
 
 .PHONY: up
@@ -50,16 +50,18 @@ monitoring-down:
 	@rm -f $(MONITORING_DATA_DIR)/grafana-datasources/location.yaml
 
 .PHONY: test
-test:
+test: proto-gen
 	go test ./...
 
 .PHONY: vet
-vet:
+vet: proto-gen
 	go vet ./...
 
 .PHONY: format
 format:
 	gofmt -w cmd internal migrations
+	$(MAKE) proto-tools
+	.bin/buf format -w proto
 
 .PHONY: clean
 clean:
@@ -87,13 +89,13 @@ image-activate: active-check monitoring
 	curl --fail --silent --max-time 10 http://127.0.0.1:18084/readyz
 
 .PHONY: install run migrate test-race
-install:
+install: proto-tools
 	go mod download
-run:
+run: proto-gen
 	go run ./cmd/location
-migrate:
+migrate: proto-gen
 	go run ./cmd/location migrate
-test-race:
+test-race: proto-gen
 	go test -race ./...
 
 .PHONY: mobile-device
@@ -101,7 +103,7 @@ mobile-device:
 	python3 scripts/mobile-device.py
 
 .PHONY: check
-check: test vet config-check
+check: proto-check test vet config-check
 	@test -z "$$(gofmt -l .)" || { gofmt -l .; exit 1; }
 
 .PHONY: image-check
@@ -137,3 +139,9 @@ active-check:
 	@test ! -e .retired || { echo "This stack has been retired" >&2; exit 1; }
 
 include makefiles/observability.mk
+
+include makefiles/proto.mk
+
+.PHONY: geo-device
+geo-device:
+	python3 scripts/geo-device.py

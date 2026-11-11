@@ -11,5 +11,5 @@ test-db-down:
 	@if [ "$$($(DOCKER) inspect -f '{{index .Config.Labels "io.mralexandrov.location.test"}}' $(TEST_DB_CONTAINER) 2>/dev/null)" = 1 ]; then $(DOCKER) stop $(TEST_DB_CONTAINER); fi
 
 test-integration: export TEST_DATABASE_URL ?= postgres://postgres@127.0.0.1:$(TEST_DB_PORT)/location_test?sslmode=disable
-test-integration:
+test-integration: proto-gen
 	go test -race -count=1 ./internal/repository

@@ -14,9 +14,18 @@ type Config struct {
 	MaxSpeedMS       float64
 	MobileTokenHash  []byte
 	MobileReleaseDir string
+	GeoTokenHash     []byte
 }
 
 func Load() (*Config, error) {
+	var geoTokenHash []byte
+	if v := os.Getenv("GEO_TOKEN_SHA256"); v != "" {
+		var err error
+		geoTokenHash, err = hex.DecodeString(v)
+		if err != nil || len(geoTokenHash) != 32 {
+			return nil, errors.New("GEO_TOKEN_SHA256 must contain a SHA-256 hex digest")
+		}
+	}
 	var mobileTokenHash []byte
 	if v := os.Getenv("MOBILE_TOKEN_SHA256"); v != "" {
 		var err error
@@ -37,6 +46,7 @@ func Load() (*Config, error) {
 		MetricsPort:      getenv("METRICS_PORT", "9104"),
 		MaxSpeedMS:       maxSpeed,
 		MobileTokenHash:  mobileTokenHash,
+		GeoTokenHash:     geoTokenHash,
 		MobileReleaseDir: getenv("MOBILE_RELEASE_DIR", "/app/mobile-releases"),
 	}, nil
 }

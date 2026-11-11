@@ -12,3 +12,6 @@ secrets/
 .mobile-releases/
 
 .observability/
+
+.bin/
+gen/

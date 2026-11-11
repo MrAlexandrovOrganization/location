@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -12,8 +13,12 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"google.golang.org/grpc"
+	geopb "location/gen/location/v1"
 	"location/internal/config"
+	"location/internal/geofence"
 	"location/internal/handler"
 	"location/internal/logx"
 	"location/internal/metrics"
@@ -120,6 +125,45 @@ func main() {
 		ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 15 * time.Second, IdleTimeout: 60 * time.Second}
 	stop, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer cancel()
+	geo := &geofence.Store{Pool: db}
+	if err := geo.RegisterMetrics(); err != nil {
+		slog.Error("geofence metrics unavailable")
+	}
+	geoDone := make(chan struct{})
+	go func() {
+		defer close(geoDone)
+		ticker := time.NewTicker(10 * time.Second)
+		defer ticker.Stop()
+		for {
+			ctx, done := context.WithTimeout(stop, 5*time.Second)
+			if err := geo.Process(ctx, time.Now().UTC()); err != nil && stop.Err() == nil {
+				slog.Error("geofence evaluation failed")
+			}
+			done()
+			select {
+			case <-stop.Done():
+				return
+			case <-ticker.C:
+			}
+		}
+	}()
+	defer func() { cancel(); <-geoDone }()
+	if len(cfg.GeoTokenHash) > 0 {
+		listener, err := net.Listen("tcp", ":50056")
+		if err != nil {
+			slog.Error("geofence listener failed")
+			return
+		}
+		geoServer := grpc.NewServer(grpc.MaxRecvMsgSize(16384), grpc.UnaryInterceptor(geofence.Auth(cfg.GeoTokenHash)), grpc.StatsHandler(otelgrpc.NewServerHandler()))
+		geopb.RegisterGeofencesServiceServer(geoServer, &geofence.Server{Store: geo})
+		go func() {
+			if err := geoServer.Serve(listener); err != nil && stop.Err() == nil {
+				slog.Error("geofence server stopped")
+				cancel()
+			}
+		}()
+		defer geoServer.Stop()
+	}
 	go func() {
 		<-stop.Done()
 		ctx, done := context.WithTimeout(context.Background(), 10*time.Second)

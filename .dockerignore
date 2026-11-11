@@ -9,3 +9,9 @@
 **/.env.*
 
 .observability/
+
+.bin/
+gen/
+secrets/
+.mobile-releases/
+/location

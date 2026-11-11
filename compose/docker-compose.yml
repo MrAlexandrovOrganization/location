@@ -15,6 +15,7 @@ services:
       start_period: 10s
     ports:
       - "127.0.0.1:18084:8080"
+      - "127.0.0.1:15056:50056"
     volumes:
       - ./.mobile-releases:/app/mobile-releases:ro
     deploy:
@@ -26,6 +27,7 @@ services:
       ADDR: ":8080"
       METRICS_PORT: "9104"
       MOBILE_TOKEN_SHA256: ${MOBILE_TOKEN_SHA256:-}
+      GEO_TOKEN_SHA256: ${GEO_TOKEN_SHA256:-}
       POSTGRES_URL: "postgres://location:${LOCATION_DB_PASSWORD:-location}@postgres:5432/location?sslmode=disable"
       OTEL_EXPORTER_OTLP_ENDPOINT: ${LOCATION_OTLP_ENDPOINT:-jaeger:4317}
     depends_on:
