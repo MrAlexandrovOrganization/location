@@ -10,3 +10,5 @@
 .local/
 secrets/
 .mobile-releases/
+
+.observability/

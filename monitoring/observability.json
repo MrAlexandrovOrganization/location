@@ -1,0 +1,35 @@
+{
+  "schema": 1,
+  "service": "location",
+  "components": [
+    "location/*"
+  ],
+  "logs": [],
+  "assets": [
+    {
+      "kind": "metrics",
+      "file": "monitoring/prometheus/location.yml",
+      "destination": "location.yml",
+      "adopt_sha256": [
+        "83009184813f2228c716d90d503696096f58b5d0383f87b04d93ffb80e7cfa48"
+      ],
+      "location": "local"
+    },
+    {
+      "kind": "datasource_templates",
+      "file": "monitoring/grafana/datasource.tpl.yaml",
+      "destination": "location.tpl.yaml",
+      "location": "central"
+    }
+  ],
+  "retire": [
+    {
+      "kind": "metrics",
+      "destination": "location.yml",
+      "sha256": [
+        "f913a6b555eb533271ea52aafee72b6e2fde123cbe2183d51f3e3828c058cb09"
+      ],
+      "location": "central"
+    }
+  ]
+}

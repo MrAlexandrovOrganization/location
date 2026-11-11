@@ -135,3 +135,5 @@ check: mobile-release-check
 .PHONY: active-check
 active-check:
 	@test ! -e .retired || { echo "This stack has been retired" >&2; exit 1; }
+
+include makefiles/observability.mk

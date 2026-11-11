@@ -1,4 +1,11 @@
-- targets: [location-metrics:9104]
-  labels:
-    project: location
-    service: location
+[
+  {
+    "targets": [
+      "location-metrics:9104"
+    ],
+    "labels": {
+      "project": "location",
+      "service": "location"
+    }
+  }
+]
