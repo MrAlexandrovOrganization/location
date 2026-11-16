@@ -147,6 +147,27 @@ func TestLocationQuality(t *testing.T) {
 		})
 	}
 
+	for _, age := range []time.Duration{167 * time.Second, 180 * time.Second, 181 * time.Second} {
+		t.Run("minute cadence anchor age "+age.String(), func(t *testing.T) {
+			reset(t)
+			anchorAt := when.Add(-age)
+			raw(t, "minute-1", 10, 20, anchorAt.Add(-2*time.Minute), "network", 20)
+			raw(t, "minute-2", 10, 20, anchorAt.Add(-time.Minute), "network", 20)
+			raw(t, "minute-3", 10, 20, anchorAt, "network", 20)
+			p, err := svc.Save(ctx, in("minute-jump", 10.3, 20, when, "gps"))
+			wantReason, wantRules := model.SpeedOutlier, 0
+			if age <= 180*time.Second {
+				wantReason, wantRules = model.CorroboratedJump, 1
+			}
+			if err != nil || !p.Hidden || p.QualityReason != wantReason {
+				t.Fatalf("minute cadence classification: %+v %v", p, err)
+			}
+			if count(t, "SELECT count(*) FROM location_blacklist") != wantRules {
+				t.Fatal("unexpected automatic rule")
+			}
+		})
+	}
+
 	for _, support := range []string{"hidden", "poor accuracy", "different provider", "too recent", "too old", "far away", "stale reference"} {
 		t.Run("extreme jump needs usable support: "+support, func(t *testing.T) {
 			reset(t)
@@ -184,7 +205,7 @@ func TestLocationQuality(t *testing.T) {
 					t.Fatal(err)
 				}
 			case "stale reference":
-				anchorAt = when.Add(-130 * time.Second)
+				anchorAt = when.Add(-181 * time.Second)
 				_, err := db.Exec(ctx, "UPDATE locations SET recorded_at=$2 WHERE id=$1", s.ID, anchorAt.Add(-time.Minute))
 				if err != nil {
 					t.Fatal(err)

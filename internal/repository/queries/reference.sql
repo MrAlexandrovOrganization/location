@@ -17,11 +17,11 @@ SELECT c.id, c.latitude, c.longitude, c.accuracy, c.live_period, c.date, c.hidde
        c.source::text, c.recorded_at, c.provider, c.quality_reason,
        c.raw_payload, c.raw_sha256, c.measurement_key, c.measurement_elapsed_ns,
        c.accuracy > 0 AND c.accuracy <= 250
-       AND c.recorded_at >= $1::timestamptz - interval '2 minutes'
+       AND c.recorded_at >= $1::timestamptz - interval '3 minutes'
        AND support.samples >= 2
        AND support.first_at <= c.recorded_at - interval '30 seconds' AS corroborated,
        c.accuracy > 0 AND c.accuracy <= 250
-       AND c.recorded_at >= $1::timestamptz - interval '2 minutes'
+       AND c.recorded_at >= $1::timestamptz - interval '3 minutes'
        AND support.samples >= 1
        AND support.first_at <= c.recorded_at - interval '30 seconds' AS corroborated_pair
 FROM chosen c
