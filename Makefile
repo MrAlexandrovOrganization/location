@@ -98,9 +98,11 @@ migrate: proto-gen
 test-race: proto-gen
 	go test -race ./...
 
-.PHONY: mobile-device
+.PHONY: mobile-device ios-device
 mobile-device:
 	python3 scripts/mobile-device.py
+ios-device:
+	python3 scripts/mobile-device.py ios
 
 .PHONY: check
 check: proto-check test vet config-check

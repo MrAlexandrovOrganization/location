@@ -52,6 +52,7 @@ func (s *svc) Save(ctx context.Context, input model.CreateInput) (*model.Locatio
 	}
 
 	loc := &model.Location{
+		Context:    input.Context,
 		ID:         id,
 		Latitude:   input.Latitude,
 		Longitude:  input.Longitude,
@@ -69,7 +70,7 @@ func (s *svc) Save(ctx context.Context, input model.CreateInput) (*model.Locatio
 	// Compare against the last non-hidden point.
 	// This handles consecutive outliers: each outlier is always compared
 	// to the last valid point, not to the previous outlier.
-	reference, err := s.repo.GetReference(ctx, recordedAt, provider)
+	reference, err := s.repo.GetReference(ctx, recordedAt, provider, source)
 	if err != nil {
 		return nil, fmt.Errorf("find location reference: %w", err)
 	}
@@ -106,7 +107,8 @@ func (s *svc) Save(ctx context.Context, input model.CreateInput) (*model.Locatio
 					"dist_m", fmt.Sprintf("%.0f", dist),
 					"dt_s", fmt.Sprintf("%.1f", dt),
 				)
-			} else if dist >= 5000 {
+			} else if source != "ios" && dist >= 5000 {
+				// Core Location provides a fused fix without Android's GPS/network distinction.
 				freshNetwork := prev.Provider == "network" && prev.Accuracy > 0 && prev.Accuracy <= 250 && dt <= 120
 				incomingNetwork := provider == "network" && input.Accuracy > 0 && input.Accuracy <= 250
 				if !freshNetwork && !incomingNetwork {
@@ -116,7 +118,7 @@ func (s *svc) Save(ctx context.Context, input model.CreateInput) (*model.Locatio
 		}
 	}
 
-	if loc.QualityReason == model.SpeedOutlier || loc.QualityReason == model.CorroboratedJump || loc.QualityReason == model.ExtremeJump {
+	if source != "ios" && (loc.QualityReason == model.SpeedOutlier || loc.QualityReason == model.CorroboratedJump || loc.QualityReason == model.ExtremeJump) {
 		err = s.repo.SaveOutlier(ctx, loc, prev.ID, loc.QualityReason)
 	} else {
 		err = s.repo.Save(ctx, loc)

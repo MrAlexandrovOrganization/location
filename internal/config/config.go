@@ -1,6 +1,7 @@
 package config
 
 import (
+	"bytes"
 	"encoding/hex"
 	"errors"
 	"os"
@@ -13,6 +14,7 @@ type Config struct {
 	MetricsPort      string
 	MaxSpeedMS       float64
 	MobileTokenHash  []byte
+	IOSTokenHash     []byte
 	MobileReleaseDir string
 	GeoTokenHash     []byte
 }
@@ -34,6 +36,17 @@ func Load() (*Config, error) {
 			return nil, errors.New("MOBILE_TOKEN_SHA256 must contain a SHA-256 hex digest")
 		}
 	}
+	var iosTokenHash []byte
+	if v := os.Getenv("IOS_TOKEN_SHA256"); v != "" {
+		var err error
+		iosTokenHash, err = hex.DecodeString(v)
+		if err != nil || len(iosTokenHash) != 32 {
+			return nil, errors.New("IOS_TOKEN_SHA256 must contain a SHA-256 hex digest")
+		}
+		if bytes.Equal(iosTokenHash, mobileTokenHash) || bytes.Equal(iosTokenHash, geoTokenHash) {
+			return nil, errors.New("IOS_TOKEN_SHA256 must use a separate token")
+		}
+	}
 	maxSpeed := 100.0
 	if v := os.Getenv("MAX_SPEED_MS"); v != "" {
 		if f, err := strconv.ParseFloat(v, 64); err == nil {
@@ -46,6 +59,7 @@ func Load() (*Config, error) {
 		MetricsPort:      getenv("METRICS_PORT", "9104"),
 		MaxSpeedMS:       maxSpeed,
 		MobileTokenHash:  mobileTokenHash,
+		IOSTokenHash:     iosTokenHash,
 		GeoTokenHash:     geoTokenHash,
 		MobileReleaseDir: getenv("MOBILE_RELEASE_DIR", "/app/mobile-releases"),
 	}, nil

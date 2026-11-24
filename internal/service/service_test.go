@@ -28,7 +28,7 @@ func (r *referenceRepository) SaveOutlier(_ context.Context, _ *model.Location, 
 	r.reason = reason
 	return nil
 }
-func (r *referenceRepository) GetReference(_ context.Context, before time.Time, _ string) (*model.Reference, error) {
+func (r *referenceRepository) GetReference(_ context.Context, before time.Time, _, _ string) (*model.Reference, error) {
 	r.before = before
 	if r.prev == nil {
 		return nil, r.err

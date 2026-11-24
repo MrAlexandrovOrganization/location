@@ -1,10 +1,12 @@
 -- Do not reset continuity at UTC/date bucket boundaries. Network fixes keep
 -- their own predecessor; GPS prefers a fresh, reasonably precise network fix.
 -- Visible quality warnings are historical data, not trusted anchors/support.
+-- $3 selects the iOS stream, which can come from a different phone.
 WITH chosen AS MATERIALIZED (
     SELECT * FROM public.locations
     WHERE NOT hidden AND quality_reason = ''
       AND recorded_at < $1 AND accuracy BETWEEN 0 AND 500
+      AND (source = 'ios') = $3::boolean
     ORDER BY CASE
         WHEN $2 = 'network' AND provider = 'network' THEN 0
         WHEN $2 = 'gps' AND provider = 'network' AND accuracy > 0 AND accuracy <= 250
@@ -29,6 +31,7 @@ CROSS JOIN LATERAL (
     SELECT count(*) AS samples, min(p.recorded_at) AS first_at
     FROM public.locations p
     WHERE NOT p.hidden AND p.quality_reason = '' AND p.provider = c.provider
+      AND (p.source = 'ios') = $3::boolean
       AND p.accuracy > 0 AND p.accuracy <= 250
       AND p.recorded_at < c.recorded_at
       AND p.recorded_at >= c.recorded_at - interval '3 minutes'

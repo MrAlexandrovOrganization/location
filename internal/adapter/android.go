@@ -16,7 +16,7 @@ import (
 // including unknown fields and invalid values, is always retained separately.
 func Android(payload json.RawMessage, received time.Time) model.CreateInput {
 	sum := sha256.Sum256(payload)
-	in := model.CreateInput{Source: "android", Provider: "unknown", RecordedAt: received.UTC(), RawPayload: payload, RawSHA256: hex.EncodeToString(sum[:]), InputReason: model.InvalidMeasurement}
+	in := model.CreateInput{Source: "android", Provider: "unknown", RecordedAt: received.UTC(), RawPayload: payload, RawSHA256: hex.EncodeToString(sum[:]), InputReason: model.InvalidMeasurement, Context: model.ParseMeasurementContext(payload, "android")}
 	var fields map[string]json.RawMessage
 	if json.Unmarshal(payload, &fields) != nil {
 		return finish(in)

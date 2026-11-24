@@ -40,7 +40,7 @@ func NewPostgres(db *pgxpool.Pool) Repository {
 
 func (r *postgres) Save(ctx context.Context, loc *model.Location) error {
 	var err error
-	if loc.MeasurementKey == "" {
+	if loc.MeasurementKey == "" && loc.Context == nil {
 		err = savePoint(ctx, r.db, loc)
 	} else {
 		tx, e := r.db.Begin(ctx)
@@ -70,8 +70,8 @@ func (r *postgres) Get(ctx context.Context, id string) (*model.Location, error) 
 	return scanLocation(row)
 }
 
-func (r *postgres) GetReference(ctx context.Context, before time.Time, provider string) (*model.Reference, error) {
-	return scanReference(r.db.QueryRow(ctx, referenceSQL, before, provider))
+func (r *postgres) GetReference(ctx context.Context, before time.Time, provider, source string) (*model.Reference, error) {
+	return scanReference(r.db.QueryRow(ctx, referenceSQL, before, provider, source == "ios"))
 }
 
 func scanReference(row scanner) (*model.Reference, error) {

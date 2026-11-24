@@ -13,7 +13,15 @@ import (
 // RegisterMobile adds a write-only API. The legacy API remains tailnet/internal.
 // Missing configuration fails closed; clients keep their durable local queue.
 func (h *Handler) RegisterMobile(mux *http.ServeMux, tokenHash []byte) {
-	mux.HandleFunc("PUT /mobile/locations/{id}", func(w http.ResponseWriter, r *http.Request) {
+	h.registerMobilePoint(mux, "PUT /mobile/locations/{id}", tokenHash, "android")
+}
+
+func (h *Handler) RegisterIOS(mux *http.ServeMux, tokenHash []byte) {
+	h.registerMobilePoint(mux, "PUT /mobile/ios/locations/{id}", tokenHash, "ios")
+}
+
+func (h *Handler) registerMobilePoint(mux *http.ServeMux, pattern string, tokenHash []byte, source string) {
+	mux.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
 		if !mobileAuthorized(w, r, tokenHash) {
 			return
 		}
@@ -24,7 +32,7 @@ func (h *Handler) RegisterMobile(mux *http.ServeMux, tokenHash []byte) {
 			return
 		}
 		raw, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 4096))
-		input, inputErr := legacyMobileInput(id, raw, time.Now())
+		input, inputErr := mobilePointInput(id, raw, time.Now(), source)
 		if err != nil || inputErr != nil {
 			writeErr(r.Context(), w, http.StatusBadRequest, "invalid point")
 			return

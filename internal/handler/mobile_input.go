@@ -2,6 +2,8 @@ package handler
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"io"
@@ -24,13 +26,14 @@ func measurementInput(id string, raw []byte, now time.Time) (model.CreateInput, 
 	return in, nil
 }
 
-func legacyMobileInput(id string, raw []byte, now time.Time) (model.CreateInput, error) {
+func mobilePointInput(id string, raw []byte, now time.Time, source string) (model.CreateInput, error) {
 	var body struct {
-		Latitude   *float64  `json:"latitude"`
-		Longitude  *float64  `json:"longitude"`
-		Accuracy   *float32  `json:"accuracy"`
-		RecordedAt time.Time `json:"recorded_at"`
-		Provider   string    `json:"provider"`
+		Latitude   *float64        `json:"latitude"`
+		Longitude  *float64        `json:"longitude"`
+		Accuracy   *float32        `json:"accuracy"`
+		RecordedAt time.Time       `json:"recorded_at"`
+		Provider   string          `json:"provider"`
+		Context    json.RawMessage `json:"context"`
 	}
 	decoder := json.NewDecoder(bytes.NewReader(raw))
 	decoder.DisallowUnknownFields()
@@ -42,6 +45,13 @@ func legacyMobileInput(id string, raw []byte, now time.Time) (model.CreateInput,
 		body.RecordedAt.Before(time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)) || body.RecordedAt.After(now.Add(24*time.Hour)) {
 		return model.CreateInput{}, errMobileInput
 	}
-	return model.CreateInput{ID: id, Latitude: *body.Latitude, Longitude: *body.Longitude, Accuracy: *body.Accuracy,
-		RecordedAt: body.RecordedAt, Date: body.RecordedAt.UTC().Format("2006-01-02"), Source: "android", Provider: body.Provider}, nil
+	in := model.CreateInput{ID: id, Latitude: *body.Latitude, Longitude: *body.Longitude, Accuracy: *body.Accuracy,
+		RecordedAt: body.RecordedAt, Date: body.RecordedAt.UTC().Format("2006-01-02"), Source: source, Provider: body.Provider}
+	in.Context = model.ParseMeasurementContext(raw, source)
+	if in.Context != nil {
+		sum := sha256.Sum256(raw)
+		in.RawPayload = append([]byte(nil), raw...)
+		in.RawSHA256 = hex.EncodeToString(sum[:])
+	}
+	return in, nil
 }

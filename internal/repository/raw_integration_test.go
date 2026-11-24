@@ -74,7 +74,7 @@ func TestRawMeasurementsAreRetainedAndRetriesRemainImmutable(t *testing.T) {
 	if err := db.QueryRow(ctx, "SELECT count(*) FROM location_outlier_observations").Scan(&n); err != nil || n != 0 {
 		t.Fatal("bad metadata became blacklist evidence", err)
 	}
-	ref, err := repo.GetReference(ctx, when, "gps")
+	ref, err := repo.GetReference(ctx, when, "gps", "android")
 	if err != nil || ref.Point.ID != "raw-first" {
 		t.Fatal("hidden raw record poisoned reference", err)
 	}

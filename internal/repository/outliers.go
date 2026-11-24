@@ -58,7 +58,7 @@ func (r *postgres) SaveOutlier(ctx context.Context, loc *model.Location, referen
 	}
 	// Recheck after acquiring the rule lock and inserting the new hidden row.
 	// A retry/conflict has already exited; it must not create any new evidence.
-	reference, err := scanReference(tx.QueryRow(ctx, referenceSQL, loc.RecordedAt, loc.Provider))
+	reference, err := scanReference(tx.QueryRow(ctx, referenceSQL, loc.RecordedAt, loc.Provider, false))
 	if err != nil {
 		return fmt.Errorf("recheck outlier reference: %w", err)
 	}

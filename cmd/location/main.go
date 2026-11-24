@@ -85,6 +85,7 @@ func main() {
 	h.Register(mux)
 	h.RegisterTelegram(mux)
 	h.RegisterMobile(mux, cfg.MobileTokenHash)
+	h.RegisterIOS(mux, cfg.IOSTokenHash)
 	h.RegisterMeasurements(mux, cfg.MobileTokenHash)
 	h.RegisterBatches(mux, cfg.MobileTokenHash)
 	h.RegisterUpdates(mux, cfg.MobileTokenHash, cfg.MobileReleaseDir)

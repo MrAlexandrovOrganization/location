@@ -24,7 +24,7 @@ func TestLocationQuality(t *testing.T) {
 	when := time.Date(2026, 1, 2, 0, 0, 20, 0, time.UTC)
 	reset := func(t *testing.T) {
 		t.Helper()
-		if _, err := db.Exec(ctx, "TRUNCATE location_outlier_observations, locations, location_blacklist RESTART IDENTITY"); err != nil {
+		if _, err := db.Exec(ctx, "TRUNCATE location_measurement_context, location_outlier_observations, locations, location_blacklist RESTART IDENTITY"); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -63,7 +63,7 @@ func TestLocationQuality(t *testing.T) {
 				t.Fatalf("quarantine: %+v %v", p, err)
 			}
 		}
-		ref, err := repo.GetReference(ctx, when.Add(time.Minute), "unknown")
+		ref, err := repo.GetReference(ctx, when.Add(time.Minute), "unknown", "android")
 		if err != nil || ref.Point.ID != "home" {
 			t.Fatal("hidden point poisoned the anchor", err)
 		}
@@ -118,7 +118,7 @@ func TestLocationQuality(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			ref, err := repo.GetReference(ctx, when, "unknown")
+			ref, err := repo.GetReference(ctx, when, "unknown", "android")
 			if err != nil || ref == nil || ref.Corroborated || !ref.CorroboratedPair {
 				t.Fatal("pair confirmation", ref, err)
 			}
@@ -212,7 +212,7 @@ func TestLocationQuality(t *testing.T) {
 				}
 			}
 			raw(t, "anchor", 10, 20, anchorAt, "unknown", 100)
-			ref, err := repo.GetReference(ctx, when, "unknown")
+			ref, err := repo.GetReference(ctx, when, "unknown", "android")
 			if err != nil || ref == nil || ref.CorroboratedPair {
 				t.Fatal("unusable support confirmed a pair", ref, err)
 			}
@@ -230,7 +230,7 @@ func TestLocationQuality(t *testing.T) {
 		reset(t)
 		raw(t, "support", 10, 20, when.Add(-110*time.Second), "unknown", 25)
 		raw(t, "anchor", 10, 20, when.Add(-53*time.Second), "unknown", 100)
-		ref, err := repo.GetReference(ctx, when, "unknown")
+		ref, err := repo.GetReference(ctx, when, "unknown", "android")
 		if err != nil || ref == nil || !ref.CorroboratedPair {
 			t.Fatal("missing initial pair", err)
 		}
@@ -293,7 +293,7 @@ func TestLocationQuality(t *testing.T) {
 		if err != nil || p.Hidden || p.QualityReason != model.PoorAccuracy {
 			t.Fatal("coarse point discarded or promoted", err)
 		}
-		ref, err := repo.GetReference(ctx, when.Add(time.Second), "network")
+		ref, err := repo.GetReference(ctx, when.Add(time.Second), "network", "android")
 		if err != nil || ref.Point.ID != "good" {
 			t.Fatal("coarse point became a reference", err)
 		}
@@ -310,11 +310,11 @@ func TestLocationQuality(t *testing.T) {
 				if _, err := db.Exec(ctx, "UPDATE locations SET quality_reason=$2 WHERE id=$1", support.ID, string(reason)); err != nil {
 					t.Fatal(err)
 				}
-				if ref, err := repo.GetReference(ctx, when, "network"); err != nil || ref != nil {
+				if ref, err := repo.GetReference(ctx, when, "network", "android"); err != nil || ref != nil {
 					t.Fatal("visible warning became an anchor", ref, err)
 				}
 				raw(t, "anchor", 10, 20, when.Add(-53*time.Second), "network", 100)
-				ref, err := repo.GetReference(ctx, when, "network")
+				ref, err := repo.GetReference(ctx, when, "network", "android")
 				if err != nil || ref == nil || ref.Point.ID != "anchor" || ref.CorroboratedPair || ref.Corroborated {
 					t.Fatal("visible warning confirmed an anchor", ref, err)
 				}

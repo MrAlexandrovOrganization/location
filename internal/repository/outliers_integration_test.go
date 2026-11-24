@@ -28,7 +28,7 @@ func TestConfirmedOutliers(t *testing.T) {
 	times := []time.Time{first, first.Add(10 * time.Minute), first.Add(2 * time.Hour), first.Add(26 * time.Hour), first.Add(26*time.Hour + 10*time.Minute)}
 	reset := func(t *testing.T) {
 		t.Helper()
-		if _, err := db.Exec(ctx, "TRUNCATE location_outlier_observations, locations, location_blacklist RESTART IDENTITY"); err != nil {
+		if _, err := db.Exec(ctx, "TRUNCATE location_measurement_context, location_outlier_observations, locations, location_blacklist RESTART IDENTITY"); err != nil {
 			t.Fatal(err)
 		}
 	}

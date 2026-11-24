@@ -58,7 +58,7 @@ func TestQualityWarningsRemainVisibleWithoutReopeningManualHides(t *testing.T) {
 			t.Fatal("quality warning or immutable raw data lost", stored, err)
 		}
 	}
-	if ref, err := repo.GetReference(ctx, callback.Add(time.Second), "network"); err != nil || ref != nil {
+	if ref, err := repo.GetReference(ctx, callback.Add(time.Second), "network", "android"); err != nil || ref != nil {
 		t.Fatal("warning became a trusted reference", ref, err)
 	}
 

@@ -77,7 +77,7 @@ func (h *Handler) RegisterBatches(mux *http.ServeMux, tokenHash []byte) {
 			if p.Format == "measurement" {
 				input, err = measurementInput(p.ID, []byte(p.Payload), time.Now())
 			} else {
-				input, err = legacyMobileInput(p.ID, []byte(p.Payload), time.Now())
+				input, err = mobilePointInput(p.ID, []byte(p.Payload), time.Now(), "android")
 			}
 			status := http.StatusOK
 			if err != nil {

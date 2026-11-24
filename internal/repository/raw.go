@@ -4,6 +4,7 @@ import (
 	"context"
 	_ "embed"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"location/internal/model"
 )
 
@@ -12,6 +13,9 @@ var lockMeasurementSQL string
 
 //go:embed queries/latest_measurement.sql
 var latestMeasurementSQL string
+
+//go:embed queries/save_context.sql
+var saveContextSQL string
 
 // Rule locks precede measurement locks on both write paths. Every observation,
 // including duplicates and late arrivals, is retained; only its derived view is hidden.
@@ -38,6 +42,18 @@ func prepareMeasurement(ctx context.Context, tx pgx.Tx, loc *model.Location) err
 
 func savePoint(ctx context.Context, q interface {
 	QueryRow(context.Context, string, ...any) pgx.Row
+	Exec(context.Context, string, ...any) (pgconn.CommandTag, error)
 }, loc *model.Location) error {
-	return q.QueryRow(ctx, saveSQL, loc.ID, loc.Latitude, loc.Longitude, loc.Accuracy, loc.LivePeriod, loc.Date, loc.Hidden, loc.Source, loc.RecordedAt, loc.Provider, string(loc.QualityReason), []byte(loc.RawPayload), loc.RawSHA256, loc.MeasurementKey, loc.MeasurementElapsedNS).Scan(&loc.Hidden)
+	err := q.QueryRow(ctx, saveSQL, loc.ID, loc.Latitude, loc.Longitude, loc.Accuracy, loc.LivePeriod, loc.Date, loc.Hidden, loc.Source, loc.RecordedAt, loc.Provider, string(loc.QualityReason), []byte(loc.RawPayload), loc.RawSHA256, loc.MeasurementKey, loc.MeasurementElapsedNS).Scan(&loc.Hidden)
+	if err != nil {
+		return err
+	}
+	if c := loc.Context; c != nil {
+		var data any
+		if len(c.Data) > 0 {
+			data = []byte(c.Data)
+		}
+		_, err = q.Exec(ctx, saveContextSQL, loc.ID, c.DeviceID, c.Status, c.Version, data)
+	}
+	return err
 }

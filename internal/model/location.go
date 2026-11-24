@@ -6,21 +6,22 @@ import (
 )
 
 type Location struct {
-	ID                   string          `json:"id"`
-	Latitude             float64         `json:"latitude"`
-	Longitude            float64         `json:"longitude"`
-	Accuracy             float32         `json:"accuracy"`
-	LivePeriod           int             `json:"live_period"`
-	Date                 string          `json:"date"`
-	Source               string          `json:"source"`
-	Hidden               bool            `json:"hidden"`
-	RecordedAt           time.Time       `json:"recorded_at"`
-	Provider             string          `json:"-"`
-	QualityReason        QualityReason   `json:"-"`
-	RawPayload           json.RawMessage `json:"-"`
-	RawSHA256            string          `json:"-"`
-	MeasurementKey       string          `json:"-"`
-	MeasurementElapsedNS int64           `json:"-"`
+	Context              *MeasurementContext `json:"-"`
+	ID                   string              `json:"id"`
+	Latitude             float64             `json:"latitude"`
+	Longitude            float64             `json:"longitude"`
+	Accuracy             float32             `json:"accuracy"`
+	LivePeriod           int                 `json:"live_period"`
+	Date                 string              `json:"date"`
+	Source               string              `json:"source"`
+	Hidden               bool                `json:"hidden"`
+	RecordedAt           time.Time           `json:"recorded_at"`
+	Provider             string              `json:"-"`
+	QualityReason        QualityReason       `json:"-"`
+	RawPayload           json.RawMessage     `json:"-"`
+	RawSHA256            string              `json:"-"`
+	MeasurementKey       string              `json:"-"`
+	MeasurementElapsedNS int64               `json:"-"`
 }
 
 type QualityReason string
@@ -55,6 +56,7 @@ func ValidProvider(provider string) bool {
 }
 
 type CreateInput struct {
+	Context *MeasurementContext
 	// ID stays stable across delivery retries from a durable client.
 	ID                   string
 	Latitude             float64

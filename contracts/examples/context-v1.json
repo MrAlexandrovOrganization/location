@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "client": {
+    "platform": "android",
+    "installation_id": "e03f3676-049d-4b45-b46c-95501b94aef1",
+    "app_version": "1.8.0+24"
+  },
+  "steps": {
+    "status": "observed",
+    "count": 12,
+    "from": "2026-11-24T12:00:00Z",
+    "to": "2026-11-24T12:01:00Z"
+  },
+  "movement": {
+    "status": "observed",
+    "last_event_at": "2026-11-24T12:00:55Z",
+    "event": "step",
+    "observing_since": "2026-11-24T11:50:00Z"
+  },
+  "collection": {
+    "mode": "normal",
+    "requested_interval_ms": 60000
+  },
+  "platform": {
+    "android": {
+      "delivery_channel": "active",
+      "passive_reason": "coarse",
+      "step_detector_status": "observed",
+      "step_counter_status": "observed"
+    }
+  }
+}
