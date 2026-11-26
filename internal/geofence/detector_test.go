@@ -45,6 +45,37 @@ func TestTransitions(t *testing.T) {
 		t.Fatal("gap fabricated an exit")
 	}
 }
+
+func TestEntryAfterGapRequiresNewConfirmation(t *testing.T) {
+	start := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
+	s := State{Stable: "unknown"}
+	for _, step := range []struct {
+		seconds   int
+		longitude float64
+		stable    string
+		candidate string
+		event     string
+	}{
+		{0, .003, "unknown", "outside", ""},
+		{60, .003, "outside", "", ""},
+		{120, 0, "outside", "inside", ""},
+		{900, 0, "outside", "inside", ""},
+		{929, 0, "outside", "inside", ""},
+		{960, 0, "inside", "", "entered"},
+		{1020, 0, "inside", "", ""},
+	} {
+		fix := Fix{Longitude: step.longitude, Accuracy: 5, At: start.Add(time.Duration(step.seconds) * time.Second)}
+		next, event, occurredAt := Advance(s, 0, 0, 100, time.Minute, fix)
+		if next.Stable != step.stable || next.Candidate != step.candidate || event != step.event {
+			t.Fatalf("at %ds: state=%q candidate=%q event=%q", step.seconds, next.Stable, next.Candidate, event)
+		}
+		if event == "entered" && !occurredAt.Equal(start.Add(900*time.Second)) {
+			t.Fatalf("entry started at %v, want first fix after the gap", occurredAt)
+		}
+		s = next
+	}
+}
+
 func TestUncertaintyCancelsCandidate(t *testing.T) {
 	now := time.Now()
 	s := State{Stable: "inside", Last: &now}

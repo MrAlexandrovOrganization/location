@@ -25,13 +25,16 @@ type Fix struct {
 }
 
 // Advance requires two separated observations, not a timer without a fresh fix.
-// Unknown initialization and resumption after a gap deliberately emit no event.
+// A gap resets the candidate and retains a confirmed outside state for arrivals.
 func Advance(s State, pLat, pLon, radius float64, confirmation time.Duration, f Fix) (State, string, time.Time) {
 	if s.Last != nil && !f.At.After(*s.Last) {
 		return s, "", time.Time{}
 	}
 	if s.Last == nil || f.At.Sub(*s.Last) > StateGap {
-		s.Stable, s.Candidate, s.Since = "unknown", "", nil
+		s.Candidate, s.Since = "", nil
+		if s.Last == nil || s.Stable != "outside" {
+			s.Stable = "unknown"
+		}
 	}
 	s.Last, s.LocationID = &f.At, f.ID
 	d := distance(pLat, pLon, f.Latitude, f.Longitude)

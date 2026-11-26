@@ -88,12 +88,21 @@ func TestGeofencesDurableTransitions(t *testing.T) {
 	}
 	save(240, 0, model.PoorAccuracy)
 	save(300, 0, model.StaleMeasurement)
-	// A long gap resumes without inventing an arrival.
+	// A confirmed outside state survives a long gap. Entry uses fresh fixes.
+	afterExit := feed.NextSequence
 	save(900, 0, "")
-	save(960, 0, "")
-	feed, err = client.ListEvents(ctx, &pb.ListEventsRequest{AfterSequence: feed.NextSequence})
+	feed, err = client.ListEvents(ctx, &pb.ListEventsRequest{AfterSequence: afterExit})
 	if err != nil || len(feed.Events) != 0 {
-		t.Fatalf("unexpected replay: %v %v", feed, err)
+		t.Fatalf("entry before confirmation: %v %v", feed, err)
+	}
+	save(960, 0, "")
+	feed, err = client.ListEvents(ctx, &pb.ListEventsRequest{AfterSequence: afterExit})
+	if err != nil || len(feed.Events) != 1 || feed.Events[0].Transition != "entered" {
+		t.Fatalf("entry after gap: %v %v", feed, err)
+	}
+	if !feed.Events[0].OccurredAt.AsTime().Equal(start.Add(900*time.Second)) ||
+		!feed.Events[0].ConfirmedAt.AsTime().Equal(start.Add(960*time.Second)) {
+		t.Fatalf("entry timestamps: %v", feed.Events[0])
 	}
 	// Delayed history stays in locations, but cannot produce a live event.
 	historical := &model.Location{ID: uuid.NewString(), Latitude: 0, Longitude: .004, Accuracy: 5, Date: "2026-01-01", Source: "android", RecordedAt: start.Add(-time.Hour)}
@@ -102,6 +111,10 @@ func TestGeofencesDurableTransitions(t *testing.T) {
 	}
 	if err = store.Process(ctx, start.Add(960*time.Second)); err != nil {
 		t.Fatal(err)
+	}
+	feed, err = client.ListEvents(ctx, &pb.ListEventsRequest{AfterSequence: feed.NextSequence})
+	if err != nil || len(feed.Events) != 0 {
+		t.Fatalf("unexpected replay: %v %v", feed, err)
 	}
 	var queued int
 	if err = db.QueryRow(ctx, "SELECT count(*) FROM geo_pending").Scan(&queued); err != nil || queued != 0 {
